@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2014, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package javax.security.auth.x500;
@@ -41,13 +41,13 @@ import sun.security.util.*;
  * of the distinguished name, or by using the ASN.1 DER encoded byte
  * representation of the distinguished name.  The current specification
  * for the string representation of a distinguished name is defined in
- * <a href="http://www.ietf.org/rfc/rfc2253.txt">RFC 2253: Lightweight
+ * <a href="http://tools.ietf.org/html/rfc2253">RFC 2253: Lightweight
  * Directory Access Protocol (v3): UTF-8 String Representation of
  * Distinguished Names</a>. This class, however, accepts string formats from
- * both RFC 2253 and <a href="http://www.ietf.org/rfc/rfc1779.txt">RFC 1779:
+ * both RFC 2253 and <a href="http://tools.ietf.org/html/rfc1779">RFC 1779:
  * A String Representation of Distinguished Names</a>, and also recognizes
  * attribute type keywords whose OIDs (Object Identifiers) are defined in
- * <a href="http://www.ietf.org/rfc/rfc3280.txt">RFC 3280: Internet X.509
+ * <a href="http://tools.ietf.org/html/rfc5280">RFC 5280: Internet X.509
  * Public Key Infrastructure Certificate and CRL Profile</a>.
  *
  * <p> The string representation for this {@code X500Principal}
@@ -108,7 +108,7 @@ public final class X500Principal implements Principal, java.io.Serializable {
      * (and listed in {@link #getName(String format) getName(String format)}),
      * as well as the T, DNQ or DNQUALIFIER, SURNAME, GIVENNAME, INITIALS,
      * GENERATION, EMAILADDRESS, and SERIALNUMBER keywords whose Object
-     * Identifiers (OIDs) are defined in RFC 3280 and its successor.
+     * Identifiers (OIDs) are defined in RFC 5280.
      * Any other attribute type must be specified as an OID.
      *
      * <p>This implementation enforces a more restrictive OID syntax than
@@ -456,7 +456,7 @@ public final class X500Principal implements Principal, java.io.Serializable {
      * (obtained via the {@code getName(X500Principal.CANONICAL)} method)
      * of this object and <i>o</i> are equal.
      *
-     * <p> This implementation is compliant with the requirements of RFC 3280.
+     * <p> This implementation is compliant with the requirements of RFC 5280.
      *
      * @param o Object to be compared for equality with this
      *          {@code X500Principal}

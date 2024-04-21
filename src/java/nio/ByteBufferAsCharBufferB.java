@@ -1,31 +1,33 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 // -- This file was mechanically generated: Do not edit! -- //
 
 package java.nio;
+
+import jdk.internal.misc.Unsafe;
 
 
 class ByteBufferAsCharBufferB                  // package-private
@@ -35,7 +37,6 @@ class ByteBufferAsCharBufferB                  // package-private
 
 
     protected final ByteBuffer bb;
-    protected final int offset;
 
 
 
@@ -50,7 +51,7 @@ class ByteBufferAsCharBufferB                  // package-private
         this.limit(cap);
         int pos = this.position();
         assert (pos <= cap);
-        offset = pos;
+        address = bb.address;
 
 
 
@@ -58,25 +59,29 @@ class ByteBufferAsCharBufferB                  // package-private
 
     ByteBufferAsCharBufferB(ByteBuffer bb,
                                      int mark, int pos, int lim, int cap,
-                                     int off)
+                                     long addr)
     {
 
         super(mark, pos, lim, cap);
         this.bb = bb;
-        offset = off;
+        address = addr;
+        assert address >= bb.address;
 
 
 
     }
 
+    @Override
+    Object base() {
+        return bb.hb;
+    }
+
     public CharBuffer slice() {
         int pos = this.position();
         int lim = this.limit();
-        assert (pos <= lim);
         int rem = (pos <= lim ? lim - pos : 0);
-        int off = (pos << 1) + offset;
-        assert (off >= 0);
-        return new ByteBufferAsCharBufferB(bb, -1, 0, rem, rem, off);
+        long addr = byteOffset(pos);
+        return new ByteBufferAsCharBufferB(bb, -1, 0, rem, rem, addr);
     }
 
     public CharBuffer duplicate() {
@@ -85,7 +90,7 @@ class ByteBufferAsCharBufferB                  // package-private
                                                     this.position(),
                                                     this.limit(),
                                                     this.capacity(),
-                                                    offset);
+                                                    address);
     }
 
     public CharBuffer asReadOnlyBuffer() {
@@ -95,7 +100,7 @@ class ByteBufferAsCharBufferB                  // package-private
                                                  this.position(),
                                                  this.limit(),
                                                  this.capacity(),
-                                                 offset);
+                                                 address);
 
 
 
@@ -103,21 +108,32 @@ class ByteBufferAsCharBufferB                  // package-private
 
 
 
-    protected int ix(int i) {
-        return (i << 1) + offset;
+    private int ix(int i) {
+        int off = (int) (address - bb.address);
+        return (i << 1) + off;
+    }
+
+    protected long byteOffset(long i) {
+        return (i << 1) + address;
     }
 
     public char get() {
-        return Bits.getCharB(bb, ix(nextGetIndex()));
+        char x = UNSAFE.getCharUnaligned(bb.hb, byteOffset(nextGetIndex()),
+            true);
+        return (x);
     }
 
     public char get(int i) {
-        return Bits.getCharB(bb, ix(checkIndex(i)));
+        char x = UNSAFE.getCharUnaligned(bb.hb, byteOffset(checkIndex(i)),
+            true);
+        return (x);
     }
 
 
    char getUnchecked(int i) {
-        return Bits.getCharB(bb, ix(i));
+        char x = UNSAFE.getCharUnaligned(bb.hb, byteOffset(i),
+            true);
+        return (x);
     }
 
 
@@ -125,7 +141,9 @@ class ByteBufferAsCharBufferB                  // package-private
 
     public CharBuffer put(char x) {
 
-        Bits.putCharB(bb, ix(nextPutIndex()), x);
+        char y = (x);
+        UNSAFE.putCharUnaligned(bb.hb, byteOffset(nextPutIndex()), y,
+            true);
         return this;
 
 
@@ -134,7 +152,9 @@ class ByteBufferAsCharBufferB                  // package-private
 
     public CharBuffer put(int i, char x) {
 
-        Bits.putCharB(bb, ix(checkIndex(i)), x);
+        char y = (x);
+        UNSAFE.putCharUnaligned(bb.hb, byteOffset(checkIndex(i)), y,
+            true);
         return this;
 
 
@@ -207,7 +227,7 @@ class ByteBufferAsCharBufferB                  // package-private
                                                   pos + start,
                                                   pos + end,
                                                   capacity(),
-                                                  offset);
+                                                  address);
     }
 
 
@@ -220,6 +240,11 @@ class ByteBufferAsCharBufferB                  // package-private
 
 
 
+    }
+
+
+    ByteOrder charRegionOrder() {
+        return order();
     }
 
 }

@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2019, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2009-2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -167,6 +167,7 @@ public final class ZoneOffsetTransitionRule implements Serializable {
      * @return the rule, not null
      * @throws IllegalArgumentException if the day of month indicator is invalid
      * @throws IllegalArgumentException if the end of day flag is true when the time is not midnight
+     * @throws IllegalArgumentException if {@code time.getNano()} returns non-zero value
      */
     public static ZoneOffsetTransitionRule of(
             Month month,
@@ -189,6 +190,9 @@ public final class ZoneOffsetTransitionRule implements Serializable {
         }
         if (timeEndOfDay && time.equals(LocalTime.MIDNIGHT) == false) {
             throw new IllegalArgumentException("Time must be midnight when end of day flag is true");
+        }
+        if (time.getNano() != 0) {
+            throw new IllegalArgumentException("Time's nano-of-second must be zero");
         }
         return new ZoneOffsetTransitionRule(month, dayOfMonthIndicator, dayOfWeek, time, timeEndOfDay, timeDefnition, standardOffset, offsetBefore, offsetAfter);
     }
@@ -220,6 +224,7 @@ public final class ZoneOffsetTransitionRule implements Serializable {
             ZoneOffset standardOffset,
             ZoneOffset offsetBefore,
             ZoneOffset offsetAfter) {
+        assert time.getNano() == 0;
         this.month = month;
         this.dom = (byte) dayOfMonthIndicator;
         this.dow = dayOfWeek;
@@ -251,7 +256,7 @@ public final class ZoneOffsetTransitionRule implements Serializable {
      * for the encoding of epoch seconds and offsets.
      * <pre style="font-size:1.0em">{@code
      *
-     *      out.writeByte(3);                // identifies a ZoneOffsetTransition
+     *      out.writeByte(3);                // identifies a ZoneOffsetTransitionRule
      *      final int timeSecs = (timeEndOfDay ? 86400 : time.toSecondOfDay());
      *      final int stdOffset = standardOffset.getTotalSeconds();
      *      final int beforeDiff = offsetBefore.getTotalSeconds() - stdOffset;

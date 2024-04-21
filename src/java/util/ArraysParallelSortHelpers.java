@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.util;
 
@@ -130,15 +130,15 @@ import java.util.concurrent.CountedCompleter;
                 int b = this.base, n = this.size, wb = this.wbase, g = this.gran;
                 while (n > g) {
                     int h = n >>> 1, q = h >>> 1, u = h + q; // quartiles
-                    Relay fc = new Relay(new Merger<T>(s, w, a, wb, h,
-                                                       wb+h, n-h, b, g, c));
-                    Relay rc = new Relay(new Merger<T>(fc, a, w, b+h, q,
-                                                       b+u, n-u, wb+h, g, c));
-                    new Sorter<T>(rc, a, w, b+u, n-u, wb+u, g, c).fork();
-                    new Sorter<T>(rc, a, w, b+h, q, wb+h, g, c).fork();;
-                    Relay bc = new Relay(new Merger<T>(fc, a, w, b, q,
-                                                       b+q, h-q, wb, g, c));
-                    new Sorter<T>(bc, a, w, b+q, h-q, wb+q, g, c).fork();
+                    Relay fc = new Relay(new Merger<>(s, w, a, wb, h,
+                                                      wb+h, n-h, b, g, c));
+                    Relay rc = new Relay(new Merger<>(fc, a, w, b+h, q,
+                                                      b+u, n-u, wb+h, g, c));
+                    new Sorter<>(rc, a, w, b+u, n-u, wb+u, g, c).fork();
+                    new Sorter<>(rc, a, w, b+h, q, wb+h, g, c).fork();;
+                    Relay bc = new Relay(new Merger<>(fc, a, w, b, q,
+                                                      b+q, h-q, wb, g, c));
+                    new Sorter<>(bc, a, w, b+q, h-q, wb+q, g, c).fork();
                     s = new EmptyCompleter(bc);
                     n = q;
                 }
@@ -199,9 +199,9 @@ import java.util.concurrent.CountedCompleter;
                                 lo = lm + 1;
                         }
                     }
-                    Merger<T> m = new Merger<T>(this, a, w, lb + lh, ln - lh,
-                                                rb + rh, rn - rh,
-                                                k + lh + rh, g, c);
+                    Merger<T> m = new Merger<>(this, a, w, lb + lh, ln - lh,
+                                               rb + rh, rn - rh,
+                                               k + lh + rh, g, c);
                     rn = rh;
                     ln = lh;
                     addToPendingCount(1);

@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1995, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
@@ -39,18 +39,18 @@ package java.io;
  * The piped input stream contains a buffer,
  * decoupling read operations from write operations,
  * within limits.
- * A pipe is said to be <a name="BROKEN"> <i>broken</i> </a> if a
+ * A pipe is said to be <a id="BROKEN"> <i>broken</i> </a> if a
  * thread that was providing data bytes to the connected
  * piped output stream is no longer alive.
  *
  * @author  James Gosling
  * @see     java.io.PipedOutputStream
- * @since   JDK1.0
+ * @since   1.0
  */
 public class PipedInputStream extends InputStream {
-    boolean closedByWriter = false;
-    volatile boolean closedByReader = false;
-    boolean connected = false;
+    boolean closedByWriter;
+    volatile boolean closedByReader;
+    boolean connected;
 
         /* REMIND: identification of the read and write sides needs to be
            more sophisticated.  Either using thread groups (but what about
@@ -63,7 +63,7 @@ public class PipedInputStream extends InputStream {
 
     /**
      * The default size of the pipe's circular input buffer.
-     * @since   JDK1.1
+     * @since   1.1
      */
     // This used to be a constant before the pipe size was allowed
     // to change. This field will continue to be maintained
@@ -72,7 +72,7 @@ public class PipedInputStream extends InputStream {
 
     /**
      * The circular buffer into which incoming data is placed.
-     * @since   JDK1.1
+     * @since   1.1
      */
     protected byte buffer[];
 
@@ -81,14 +81,14 @@ public class PipedInputStream extends InputStream {
      * next byte of data will be stored when received from the connected
      * piped output stream. <code>in&lt;0</code> implies the buffer is empty,
      * <code>in==out</code> implies the buffer is full
-     * @since   JDK1.1
+     * @since   1.1
      */
     protected int in = -1;
 
     /**
      * The index of the position in the circular buffer at which the next
      * byte of data will be read by this piped input stream.
-     * @since   JDK1.1
+     * @since   1.1
      */
     protected int out = 0;
 
@@ -195,7 +195,7 @@ public class PipedInputStream extends InputStream {
      * @exception IOException If the pipe is <a href="#BROKEN"> <code>broken</code></a>,
      *          {@link #connect(java.io.PipedOutputStream) unconnected},
      *          closed, or if an I/O error occurs.
-     * @since     JDK1.1
+     * @since     1.1
      */
     protected synchronized void receive(int b) throws IOException {
         checkStateForReceive();
@@ -421,7 +421,7 @@ public class PipedInputStream extends InputStream {
      *          <a href="#BROKEN"> <code>broken</code></a>.
      *
      * @exception  IOException  if an I/O error occurs.
-     * @since   JDK1.0.2
+     * @since   1.0.2
      */
     public synchronized int available() throws IOException {
         if(in < 0)

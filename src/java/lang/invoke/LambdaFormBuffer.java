@@ -1,32 +1,34 @@
 /*
- * Copyright (c) 2013, 2014, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.invoke;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+
 import static java.lang.invoke.LambdaForm.*;
 import static java.lang.invoke.LambdaForm.BasicType.*;
 
@@ -40,7 +42,6 @@ final class LambdaFormBuffer {
     private byte flags;
     private int firstChange;
     private Name resultName;
-    private String debugName;
     private ArrayList<Name> dups;
 
     private static final int F_TRANS = 0x10, F_OWNED = 0x03;
@@ -50,15 +51,15 @@ final class LambdaFormBuffer {
         setNames(lf.names);
         int result = lf.result;
         if (result == LAST_RESULT)  result = length - 1;
-        if (result >= 0 && lf.names[result].type != V_TYPE)
+        if (result >= 0 && lf.names[result].type != V_TYPE) {
             resultName = lf.names[result];
-        debugName = lf.debugName;
+        }
         assert(lf.nameRefsAreLegal());
     }
 
     private LambdaForm lambdaForm() {
         assert(!inTrans());  // need endEdit call to tidy things up
-        return new LambdaForm(debugName, arity, nameArray(), resultIndex());
+        return new LambdaForm(arity, nameArray(), resultIndex());
     }
 
     Name name(int i) {
@@ -114,9 +115,9 @@ final class LambdaFormBuffer {
         return true;
     }
 
-    private static int indexOf(NamedFunction fn, NamedFunction[] fns) {
-        for (int i = 0; i < fns.length; i++) {
-            if (fns[i] == fn)  return i;
+    private static int indexOf(NamedFunction fn, List<NamedFunction> fns) {
+        for (int i = 0; i < fns.size(); i++) {
+            if (fns.get(i) == fn)  return i;
         }
         return -1;
     }
@@ -249,7 +250,7 @@ final class LambdaFormBuffer {
         assert(inTrans());
     }
 
-    private void changeName(int i, Name name) {
+    void changeName(int i, Name name) {
         assert(inTrans());
         assert(i < length);
         Name oldName = names[i];
@@ -326,15 +327,15 @@ final class LambdaFormBuffer {
      *  whose function is in the corresponding position in newFns.
      *  Only do this if the arguments are exactly equal to the given.
      */
-    LambdaFormBuffer replaceFunctions(NamedFunction[] oldFns, NamedFunction[] newFns,
+    LambdaFormBuffer replaceFunctions(List<NamedFunction> oldFns, List<NamedFunction> newFns,
                                       Object... forArguments) {
         assert(inTrans());
-        if (oldFns.length == 0)  return this;
+        if (oldFns.isEmpty())  return this;
         for (int i = arity; i < length; i++) {
             Name n = names[i];
             int nfi = indexOf(n.function, oldFns);
             if (nfi >= 0 && Arrays.equals(n.arguments, forArguments)) {
-                changeName(i, new Name(newFns[nfi], n.arguments));
+                changeName(i, new Name(newFns.get(nfi), n.arguments));
             }
         }
         return this;

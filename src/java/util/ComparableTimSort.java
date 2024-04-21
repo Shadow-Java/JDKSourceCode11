@@ -1,27 +1,27 @@
 /*
  * Copyright (c) 2009, 2013, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2009 Google Inc.  All Rights Reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util;
@@ -305,7 +305,7 @@ class ComparableTimSort {
      * @param a the array in which a run is to be counted and possibly reversed
      * @param lo index of the first element in the run
      * @param hi index after the last element that may be contained in the run.
-              It is required that {@code lo < hi}.
+     *        It is required that {@code lo < hi}.
      * @return  the length of the run beginning at the specified position in
      *          the specified array
      */
@@ -394,19 +394,23 @@ class ComparableTimSort {
      * This method is called each time a new run is pushed onto the stack,
      * so the invariants are guaranteed to hold for i < stackSize upon
      * entry to the method.
+     *
+     * Thanks to Stijn de Gouw, Jurriaan Rot, Frank S. de Boer,
+     * Richard Bubel and Reiner Hahnle, this is fixed with respect to
+     * the analysis in "On the Worst-Case Complexity of TimSort" by
+     * Nicolas Auger, Vincent Jug, Cyril Nicaud, and Carine Pivoteau.
      */
     private void mergeCollapse() {
         while (stackSize > 1) {
             int n = stackSize - 2;
-            if (n > 0 && runLen[n-1] <= runLen[n] + runLen[n+1]) {
+            if (n > 0 && runLen[n-1] <= runLen[n] + runLen[n+1] ||
+                n > 1 && runLen[n-2] <= runLen[n] + runLen[n-1]) {
                 if (runLen[n - 1] < runLen[n + 1])
                     n--;
-                mergeAt(n);
-            } else if (runLen[n] <= runLen[n + 1]) {
-                mergeAt(n);
-            } else {
+            } else if (n < 0 || runLen[n] > runLen[n + 1]) {
                 break; // Invariant is established
             }
+            mergeAt(n);
         }
     }
 
@@ -883,12 +887,7 @@ class ComparableTimSort {
     private Object[]  ensureCapacity(int minCapacity) {
         if (tmpLen < minCapacity) {
             // Compute smallest power of 2 > minCapacity
-            int newSize = minCapacity;
-            newSize |= newSize >> 1;
-            newSize |= newSize >> 2;
-            newSize |= newSize >> 4;
-            newSize |= newSize >> 8;
-            newSize |= newSize >> 16;
+            int newSize = -1 >>> Integer.numberOfLeadingZeros(minCapacity);
             newSize++;
 
             if (newSize < 0) // Not bloody likely!

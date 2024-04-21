@@ -1,141 +1,293 @@
 /*
- * Copyright (c) 1995, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2003, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang;
 
-import java.io.IOException;
-import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileDescriptor;
+import java.lang.ProcessBuilder.Redirect;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.lang.ProcessBuilder.Redirect;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
+import java.io.ByteArrayInputStream;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.security.AccessController;
+import static java.security.AccessController.doPrivileged;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
+import java.util.Properties;
+import jdk.internal.misc.JavaIOFileDescriptorAccess;
+import jdk.internal.misc.SharedSecrets;
+import jdk.internal.util.StaticProperty;
+import sun.security.action.GetPropertyAction;
 
-/* This class is for the exclusive use of ProcessBuilder.start() to
- * create new processes.
+/**
+ * java.lang.Process subclass in the UNIX environment.
  *
+ * @author Mario Wolczko and Ross Knippel.
+ * @author Konstantin Kladko (ported to Linux and Bsd)
  * @author Martin Buchholz
+ * @author Volker Simonis (ported to AIX)
  * @since   1.5
  */
-
 final class ProcessImpl extends Process {
-    private static final sun.misc.JavaIOFileDescriptorAccess fdAccess
-        = sun.misc.SharedSecrets.getJavaIOFileDescriptorAccess();
+    private static final JavaIOFileDescriptorAccess fdAccess
+        = SharedSecrets.getJavaIOFileDescriptorAccess();
 
-    /**
-     * Open a file for writing. If {@code append} is {@code true} then the file
-     * is opened for atomic append directly and a FileOutputStream constructed
-     * with the resulting handle. This is because a FileOutputStream created
-     * to append to a file does not open the file in a manner that guarantees
-     * that writes by the child process will be atomic.
-     */
-    private static FileOutputStream newFileOutputStream(File f, boolean append)
-        throws IOException
-    {
-        if (append) {
-            String path = f.getPath();
-            SecurityManager sm = System.getSecurityManager();
-            if (sm != null)
-                sm.checkWrite(path);
-            long handle = openForAtomicAppend(path);
-            final FileDescriptor fd = new FileDescriptor();
-            fdAccess.setHandle(fd, handle);
+    // Linux platforms support a normal (non-forcible) kill signal.
+    static final boolean SUPPORTS_NORMAL_TERMINATION = true;
+
+    private final int pid;
+    private final ProcessHandleImpl processHandle;
+    private int exitcode;
+    private boolean hasExited;
+
+    private /* final */ OutputStream stdin;
+    private /* final */ InputStream  stdout;
+    private /* final */ InputStream  stderr;
+
+    // only used on Solaris
+    private /* final */ DeferredCloseInputStream stdout_inner_stream;
+
+    private static enum LaunchMechanism {
+        // order IS important!
+        FORK,
+        POSIX_SPAWN,
+        VFORK
+    }
+
+    private static enum Platform {
+
+        LINUX(LaunchMechanism.VFORK, LaunchMechanism.POSIX_SPAWN, LaunchMechanism.FORK),
+
+        BSD(LaunchMechanism.POSIX_SPAWN, LaunchMechanism.FORK),
+
+        SOLARIS(LaunchMechanism.POSIX_SPAWN, LaunchMechanism.FORK),
+
+        AIX(LaunchMechanism.POSIX_SPAWN, LaunchMechanism.FORK);
+
+        final LaunchMechanism defaultLaunchMechanism;
+        final Set<LaunchMechanism> validLaunchMechanisms;
+
+        Platform(LaunchMechanism ... launchMechanisms) {
+            this.defaultLaunchMechanism = launchMechanisms[0];
+            this.validLaunchMechanisms =
+                EnumSet.copyOf(Arrays.asList(launchMechanisms));
+        }
+
+        @SuppressWarnings("fallthrough")
+        private String helperPath(String javahome, String osArch) {
+            switch (this) {
+                case SOLARIS:
+                    // fall through...
+                case LINUX:
+                case AIX:
+                case BSD:
+                    return javahome + "/lib/jspawnhelper";
+
+                default:
+                    throw new AssertionError("Unsupported platform: " + this);
+            }
+        }
+
+        String helperPath() {
+            Properties props = GetPropertyAction.privilegedGetProperties();
+            return helperPath(StaticProperty.javaHome(),
+                              props.getProperty("os.arch"));
+        }
+
+        LaunchMechanism launchMechanism() {
             return AccessController.doPrivileged(
-                new PrivilegedAction<FileOutputStream>() {
-                    public FileOutputStream run() {
-                        return new FileOutputStream(fd);
+                (PrivilegedAction<LaunchMechanism>) () -> {
+                    String s = System.getProperty(
+                        "jdk.lang.Process.launchMechanism");
+                    LaunchMechanism lm;
+                    if (s == null) {
+                        lm = defaultLaunchMechanism;
+                        s = lm.name().toLowerCase(Locale.ENGLISH);
+                    } else {
+                        try {
+                            lm = LaunchMechanism.valueOf(
+                                s.toUpperCase(Locale.ENGLISH));
+                        } catch (IllegalArgumentException e) {
+                            lm = null;
+                        }
                     }
+                    if (lm == null || !validLaunchMechanisms.contains(lm)) {
+                        throw new Error(
+                            s + " is not a supported " +
+                            "process launch mechanism on this platform."
+                        );
+                    }
+                    return lm;
                 }
             );
-        } else {
-            return new FileOutputStream(f);
+        }
+
+        static Platform get() {
+            String osName = GetPropertyAction.privilegedGetProperty("os.name");
+
+            if (osName.equals("Linux")) { return LINUX; }
+            if (osName.contains("OS X")) { return BSD; }
+            if (osName.equals("SunOS")) { return SOLARIS; }
+            if (osName.equals("AIX")) { return AIX; }
+
+            throw new Error(osName + " is not a supported OS platform.");
         }
     }
 
-    // System-dependent portion of ProcessBuilder.start()
-    static Process start(String cmdarray[],
+    private static final Platform platform = Platform.get();
+    private static final LaunchMechanism launchMechanism = platform.launchMechanism();
+    private static final byte[] helperpath = toCString(platform.helperPath());
+
+    private static byte[] toCString(String s) {
+        if (s == null)
+            return null;
+        byte[] bytes = s.getBytes();
+        byte[] result = new byte[bytes.length + 1];
+        System.arraycopy(bytes, 0,
+                         result, 0,
+                         bytes.length);
+        result[result.length-1] = (byte)0;
+        return result;
+    }
+
+    // Only for use by ProcessBuilder.start()
+    static Process start(String[] cmdarray,
                          java.util.Map<String,String> environment,
                          String dir,
                          ProcessBuilder.Redirect[] redirects,
                          boolean redirectErrorStream)
-        throws IOException
+            throws IOException
     {
-        String envblock = ProcessEnvironment.toEnvironmentBlock(environment);
+        assert cmdarray != null && cmdarray.length > 0;
+
+        // Convert arguments to a contiguous block; it's easier to do
+        // memory management in Java than in C.
+        byte[][] args = new byte[cmdarray.length-1][];
+        int size = args.length; // For added NUL bytes
+        for (int i = 0; i < args.length; i++) {
+            args[i] = cmdarray[i+1].getBytes();
+            size += args[i].length;
+        }
+        byte[] argBlock = new byte[size];
+        int i = 0;
+        for (byte[] arg : args) {
+            System.arraycopy(arg, 0, argBlock, i, arg.length);
+            i += arg.length + 1;
+            // No need to write NUL bytes explicitly
+        }
+
+        int[] envc = new int[1];
+        byte[] envBlock = ProcessEnvironment.toEnvironmentBlock(environment, envc);
+
+        int[] std_fds;
 
         FileInputStream  f0 = null;
         FileOutputStream f1 = null;
         FileOutputStream f2 = null;
 
         try {
-            long[] stdHandles;
+            boolean forceNullOutputStream = false;
             if (redirects == null) {
-                stdHandles = new long[] { -1L, -1L, -1L };
+                std_fds = new int[] { -1, -1, -1 };
             } else {
-                stdHandles = new long[3];
+                std_fds = new int[3];
 
-                if (redirects[0] == Redirect.PIPE)
-                    stdHandles[0] = -1L;
-                else if (redirects[0] == Redirect.INHERIT)
-                    stdHandles[0] = fdAccess.getHandle(FileDescriptor.in);
-                else {
+                if (redirects[0] == Redirect.PIPE) {
+                    std_fds[0] = -1;
+                } else if (redirects[0] == Redirect.INHERIT) {
+                    std_fds[0] = 0;
+                } else if (redirects[0] instanceof ProcessBuilder.RedirectPipeImpl) {
+                    std_fds[0] = fdAccess.get(((ProcessBuilder.RedirectPipeImpl) redirects[0]).getFd());
+                } else {
                     f0 = new FileInputStream(redirects[0].file());
-                    stdHandles[0] = fdAccess.getHandle(f0.getFD());
+                    std_fds[0] = fdAccess.get(f0.getFD());
                 }
 
-                if (redirects[1] == Redirect.PIPE)
-                    stdHandles[1] = -1L;
-                else if (redirects[1] == Redirect.INHERIT)
-                    stdHandles[1] = fdAccess.getHandle(FileDescriptor.out);
-                else {
-                    f1 = newFileOutputStream(redirects[1].file(),
-                                             redirects[1].append());
-                    stdHandles[1] = fdAccess.getHandle(f1.getFD());
+                if (redirects[1] == Redirect.PIPE) {
+                    std_fds[1] = -1;
+                } else if (redirects[1] == Redirect.INHERIT) {
+                    std_fds[1] = 1;
+                } else if (redirects[1] instanceof ProcessBuilder.RedirectPipeImpl) {
+                    std_fds[1] = fdAccess.get(((ProcessBuilder.RedirectPipeImpl) redirects[1]).getFd());
+                    // Force getInputStream to return a null stream,
+                    // the fd is directly assigned to the next process.
+                    forceNullOutputStream = true;
+                } else {
+                    f1 = new FileOutputStream(redirects[1].file(),
+                            redirects[1].append());
+                    std_fds[1] = fdAccess.get(f1.getFD());
                 }
 
-                if (redirects[2] == Redirect.PIPE)
-                    stdHandles[2] = -1L;
-                else if (redirects[2] == Redirect.INHERIT)
-                    stdHandles[2] = fdAccess.getHandle(FileDescriptor.err);
-                else {
-                    f2 = newFileOutputStream(redirects[2].file(),
-                                             redirects[2].append());
-                    stdHandles[2] = fdAccess.getHandle(f2.getFD());
+                if (redirects[2] == Redirect.PIPE) {
+                    std_fds[2] = -1;
+                } else if (redirects[2] == Redirect.INHERIT) {
+                    std_fds[2] = 2;
+                } else if (redirects[2] instanceof ProcessBuilder.RedirectPipeImpl) {
+                    std_fds[2] = fdAccess.get(((ProcessBuilder.RedirectPipeImpl) redirects[2]).getFd());
+                } else {
+                    f2 = new FileOutputStream(redirects[2].file(),
+                            redirects[2].append());
+                    std_fds[2] = fdAccess.get(f2.getFD());
                 }
             }
 
-            return new ProcessImpl(cmdarray, envblock, dir,
-                                   stdHandles, redirectErrorStream);
+            Process p = new ProcessImpl
+                    (toCString(cmdarray[0]),
+                            argBlock, args.length,
+                            envBlock, envc[0],
+                            toCString(dir),
+                            std_fds,
+                            forceNullOutputStream,
+                            redirectErrorStream);
+            if (redirects != null) {
+                // Copy the fd's if they are to be redirected to another process
+                if (std_fds[0] >= 0 &&
+                        redirects[0] instanceof ProcessBuilder.RedirectPipeImpl) {
+                    fdAccess.set(((ProcessBuilder.RedirectPipeImpl) redirects[0]).getFd(), std_fds[0]);
+                }
+                if (std_fds[1] >= 0 &&
+                        redirects[1] instanceof ProcessBuilder.RedirectPipeImpl) {
+                    fdAccess.set(((ProcessBuilder.RedirectPipeImpl) redirects[1]).getFd(), std_fds[1]);
+                }
+                if (std_fds[2] >= 0 &&
+                        redirects[2] instanceof ProcessBuilder.RedirectPipeImpl) {
+                    fdAccess.set(((ProcessBuilder.RedirectPipeImpl) redirects[2]).getFd(), std_fds[2]);
+                }
+            }
+            return p;
         } finally {
             // In theory, close() can throw IOException
             // (although it is rather unlikely to happen here)
@@ -145,397 +297,682 @@ final class ProcessImpl extends Process {
                 finally { if (f2 != null) f2.close(); }
             }
         }
-
     }
 
-    private static class LazyPattern {
-        // Escape-support version:
-        //    "(\")((?:\\\\\\1|.)+?)\\1|([^\\s\"]+)";
-        private static final Pattern PATTERN =
-            Pattern.compile("[^\\s\"]+|\"[^\"]*\"");
-    };
 
-    /* Parses the command string parameter into the executable name and
-     * program arguments.
-     *
-     * The command string is broken into tokens. The token separator is a space
-     * or quota character. The space inside quotation is not a token separator.
-     * There are no escape sequences.
+    /**
+     * Creates a process. Depending on the {@code mode} flag, this is done by
+     * one of the following mechanisms:
+     * <pre>
+     *   1 - fork(2) and exec(2)
+     *   2 - posix_spawn(3P)
+     *   3 - vfork(2) and exec(2)
+     * </pre>
+     * @param fds an array of three file descriptors.
+     *        Indexes 0, 1, and 2 correspond to standard input,
+     *        standard output and standard error, respectively.  On
+     *        input, a value of -1 means to create a pipe to connect
+     *        child and parent processes.  On output, a value which
+     *        is not -1 is the parent pipe fd corresponding to the
+     *        pipe which has been created.  An element of this array
+     *        is -1 on input if and only if it is <em>not</em> -1 on
+     *        output.
+     * @return the pid of the subprocess
      */
-    private static String[] getTokensFromCommand(String command) {
-        ArrayList<String> matchList = new ArrayList<>(8);
-        Matcher regexMatcher = LazyPattern.PATTERN.matcher(command);
-        while (regexMatcher.find())
-            matchList.add(regexMatcher.group());
-        return matchList.toArray(new String[matchList.size()]);
-    }
+    private native int forkAndExec(int mode, byte[] helperpath,
+                                   byte[] prog,
+                                   byte[] argBlock, int argc,
+                                   byte[] envBlock, int envc,
+                                   byte[] dir,
+                                   int[] fds,
+                                   boolean redirectErrorStream)
+        throws IOException;
 
-    private static final int VERIFICATION_CMD_BAT = 0;
-    private static final int VERIFICATION_WIN32 = 1;
-    private static final int VERIFICATION_LEGACY = 2;
-    private static final char ESCAPE_VERIFICATION[][] = {
-        // We guarantee the only command file execution for implicit [cmd.exe] run.
-        //    http://technet.microsoft.com/en-us/library/bb490954.aspx
-        {' ', '\t', '<', '>', '&', '|', '^'},
+    private ProcessImpl(final byte[] prog,
+                final byte[] argBlock, final int argc,
+                final byte[] envBlock, final int envc,
+                final byte[] dir,
+                final int[] fds,
+                final boolean forceNullOutputStream,
+                final boolean redirectErrorStream)
+            throws IOException {
 
-        {' ', '\t', '<', '>'},
-        {' ', '\t'}
-    };
+        pid = forkAndExec(launchMechanism.ordinal() + 1,
+                          helperpath,
+                          prog,
+                          argBlock, argc,
+                          envBlock, envc,
+                          dir,
+                          fds,
+                          redirectErrorStream);
+        processHandle = ProcessHandleImpl.getInternal(pid);
 
-    private static String createCommandLine(int verificationType,
-                                     final String executablePath,
-                                     final String cmd[])
-    {
-        StringBuilder cmdbuf = new StringBuilder(80);
-
-        cmdbuf.append(executablePath);
-
-        for (int i = 1; i < cmd.length; ++i) {
-            cmdbuf.append(' ');
-            String s = cmd[i];
-            if (needsEscaping(verificationType, s)) {
-                cmdbuf.append('"').append(s);
-
-                // The code protects the [java.exe] and console command line
-                // parser, that interprets the [\"] combination as an escape
-                // sequence for the ["] char.
-                //     http://msdn.microsoft.com/en-us/library/17w5ykft.aspx
-                //
-                // If the argument is an FS path, doubling of the tail [\]
-                // char is not a problem for non-console applications.
-                //
-                // The [\"] sequence is not an escape sequence for the [cmd.exe]
-                // command line parser. The case of the [""] tail escape
-                // sequence could not be realized due to the argument validation
-                // procedure.
-                if ((verificationType != VERIFICATION_CMD_BAT) && s.endsWith("\\")) {
-                    cmdbuf.append('\\');
-                }
-                cmdbuf.append('"');
-            } else {
-                cmdbuf.append(s);
-            }
+        try {
+            doPrivileged((PrivilegedExceptionAction<Void>) () -> {
+                initStreams(fds, forceNullOutputStream);
+                return null;
+            });
+        } catch (PrivilegedActionException ex) {
+            throw (IOException) ex.getException();
         }
-        return cmdbuf.toString();
     }
 
-    private static boolean isQuoted(boolean noQuotesInside, String arg,
-            String errorMessage) {
-        int lastPos = arg.length() - 1;
-        if (lastPos >=1 && arg.charAt(0) == '"' && arg.charAt(lastPos) == '"') {
-            // The argument has already been quoted.
-            if (noQuotesInside) {
-                if (arg.indexOf('"', 1) != lastPos) {
-                    // There is ["] inside.
-                    throw new IllegalArgumentException(errorMessage);
-                }
-            }
-            return true;
+    static FileDescriptor newFileDescriptor(int fd) {
+        FileDescriptor fileDescriptor = new FileDescriptor();
+        fdAccess.set(fileDescriptor, fd);
+        return fileDescriptor;
+    }
+
+    /**
+     * Initialize the streams from the file descriptors.
+     * @param fds array of stdin, stdout, stderr fds
+     * @param forceNullOutputStream true if the stdout is being directed to
+     *        a subsequent process. The stdout stream should be a null output stream .
+     * @throws IOException
+     */
+    void initStreams(int[] fds, boolean forceNullOutputStream) throws IOException {
+        switch (platform) {
+            case LINUX:
+            case BSD:
+                stdin = (fds[0] == -1) ?
+                        ProcessBuilder.NullOutputStream.INSTANCE :
+                        new ProcessPipeOutputStream(fds[0]);
+
+                stdout = (fds[1] == -1 || forceNullOutputStream) ?
+                         ProcessBuilder.NullInputStream.INSTANCE :
+                         new ProcessPipeInputStream(fds[1]);
+
+                stderr = (fds[2] == -1) ?
+                         ProcessBuilder.NullInputStream.INSTANCE :
+                         new ProcessPipeInputStream(fds[2]);
+
+                ProcessHandleImpl.completion(pid, true).handle((exitcode, throwable) -> {
+                    synchronized (this) {
+                        this.exitcode = (exitcode == null) ? -1 : exitcode.intValue();
+                        this.hasExited = true;
+                        this.notifyAll();
+                    }
+
+                    if (stdout instanceof ProcessPipeInputStream)
+                        ((ProcessPipeInputStream) stdout).processExited();
+
+                    if (stderr instanceof ProcessPipeInputStream)
+                        ((ProcessPipeInputStream) stderr).processExited();
+
+                    if (stdin instanceof ProcessPipeOutputStream)
+                        ((ProcessPipeOutputStream) stdin).processExited();
+
+                    return null;
+                });
+                break;
+
+            case SOLARIS:
+                stdin = (fds[0] == -1) ?
+                        ProcessBuilder.NullOutputStream.INSTANCE :
+                        new BufferedOutputStream(
+                            new FileOutputStream(newFileDescriptor(fds[0])));
+
+                stdout = (fds[1] == -1 || forceNullOutputStream) ?
+                         ProcessBuilder.NullInputStream.INSTANCE :
+                         new BufferedInputStream(
+                             stdout_inner_stream =
+                                 new DeferredCloseInputStream(
+                                     newFileDescriptor(fds[1])));
+
+                stderr = (fds[2] == -1) ?
+                         ProcessBuilder.NullInputStream.INSTANCE :
+                         new DeferredCloseInputStream(newFileDescriptor(fds[2]));
+
+                /*
+                 * For each subprocess forked a corresponding reaper task
+                 * is submitted.  That task is the only thread which waits
+                 * for the subprocess to terminate and it doesn't hold any
+                 * locks while doing so.  This design allows waitFor() and
+                 * exitStatus() to be safely executed in parallel (and they
+                 * need no native code).
+                 */
+                ProcessHandleImpl.completion(pid, true).handle((exitcode, throwable) -> {
+                    synchronized (this) {
+                        this.exitcode = (exitcode == null) ? -1 : exitcode.intValue();
+                        this.hasExited = true;
+                        this.notifyAll();
+                    }
+                    return null;
+                });
+                break;
+
+            case AIX:
+                stdin = (fds[0] == -1) ?
+                        ProcessBuilder.NullOutputStream.INSTANCE :
+                        new ProcessPipeOutputStream(fds[0]);
+
+                stdout = (fds[1] == -1 || forceNullOutputStream) ?
+                         ProcessBuilder.NullInputStream.INSTANCE :
+                         new DeferredCloseProcessPipeInputStream(fds[1]);
+
+                stderr = (fds[2] == -1) ?
+                         ProcessBuilder.NullInputStream.INSTANCE :
+                         new DeferredCloseProcessPipeInputStream(fds[2]);
+
+                ProcessHandleImpl.completion(pid, true).handle((exitcode, throwable) -> {
+                    synchronized (this) {
+                        this.exitcode = (exitcode == null) ? -1 : exitcode.intValue();
+                        this.hasExited = true;
+                        this.notifyAll();
+                    }
+
+                    if (stdout instanceof DeferredCloseProcessPipeInputStream)
+                        ((DeferredCloseProcessPipeInputStream) stdout).processExited();
+
+                    if (stderr instanceof DeferredCloseProcessPipeInputStream)
+                        ((DeferredCloseProcessPipeInputStream) stderr).processExited();
+
+                    if (stdin instanceof ProcessPipeOutputStream)
+                        ((ProcessPipeOutputStream) stdin).processExited();
+
+                    return null;
+                });
+                break;
+
+            default: throw new AssertionError("Unsupported platform: " + platform);
         }
-        if (noQuotesInside) {
-            if (arg.indexOf('"') >= 0) {
-                // There is ["] inside.
-                throw new IllegalArgumentException(errorMessage);
-            }
-        }
-        return false;
-    }
-
-    private static boolean needsEscaping(int verificationType, String arg) {
-        // Switch off MS heuristic for internal ["].
-        // Please, use the explicit [cmd.exe] call
-        // if you need the internal ["].
-        //    Example: "cmd.exe", "/C", "Extended_MS_Syntax"
-
-        // For [.exe] or [.com] file the unpaired/internal ["]
-        // in the argument is not a problem.
-        boolean argIsQuoted = isQuoted(
-            (verificationType == VERIFICATION_CMD_BAT),
-            arg, "Argument has embedded quote, use the explicit CMD.EXE call.");
-
-        if (!argIsQuoted) {
-            char testEscape[] = ESCAPE_VERIFICATION[verificationType];
-            for (int i = 0; i < testEscape.length; ++i) {
-                if (arg.indexOf(testEscape[i]) >= 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private static String getExecutablePath(String path)
-        throws IOException
-    {
-        boolean pathIsQuoted = isQuoted(true, path,
-                "Executable name has embedded quote, split the arguments");
-
-        // Win32 CreateProcess requires path to be normalized
-        File fileToRun = new File(pathIsQuoted
-            ? path.substring(1, path.length() - 1)
-            : path);
-
-        // From the [CreateProcess] function documentation:
-        //
-        // "If the file name does not contain an extension, .exe is appended.
-        // Therefore, if the file name extension is .com, this parameter
-        // must include the .com extension. If the file name ends in
-        // a period (.) with no extension, or if the file name contains a path,
-        // .exe is not appended."
-        //
-        // "If the file name !does not contain a directory path!,
-        // the system searches for the executable file in the following
-        // sequence:..."
-        //
-        // In practice ANY non-existent path is extended by [.exe] extension
-        // in the [CreateProcess] funcion with the only exception:
-        // the path ends by (.)
-
-        return fileToRun.getPath();
-    }
-
-
-    private boolean isShellFile(String executablePath) {
-        String upPath = executablePath.toUpperCase();
-        return (upPath.endsWith(".CMD") || upPath.endsWith(".BAT"));
-    }
-
-    private String quoteString(String arg) {
-        StringBuilder argbuf = new StringBuilder(arg.length() + 2);
-        return argbuf.append('"').append(arg).append('"').toString();
-    }
-
-
-    private long handle = 0;
-    private OutputStream stdin_stream;
-    private InputStream stdout_stream;
-    private InputStream stderr_stream;
-
-    private ProcessImpl(String cmd[],
-                        final String envblock,
-                        final String path,
-                        final long[] stdHandles,
-                        final boolean redirectErrorStream)
-        throws IOException
-    {
-        String cmdstr;
-        SecurityManager security = System.getSecurityManager();
-        boolean allowAmbiguousCommands = false;
-        if (security == null) {
-            allowAmbiguousCommands = true;
-            String value = System.getProperty("jdk.lang.Process.allowAmbiguousCommands");
-            if (value != null)
-                allowAmbiguousCommands = !"false".equalsIgnoreCase(value);
-        }
-        if (allowAmbiguousCommands) {
-            // Legacy mode.
-
-            // Normalize path if possible.
-            String executablePath = new File(cmd[0]).getPath();
-
-            // No worry about internal, unpaired ["], and redirection/piping.
-            if (needsEscaping(VERIFICATION_LEGACY, executablePath) )
-                executablePath = quoteString(executablePath);
-
-            cmdstr = createCommandLine(
-                //legacy mode doesn't worry about extended verification
-                VERIFICATION_LEGACY,
-                executablePath,
-                cmd);
-        } else {
-            String executablePath;
-            try {
-                executablePath = getExecutablePath(cmd[0]);
-            } catch (IllegalArgumentException e) {
-                // Workaround for the calls like
-                // Runtime.getRuntime().exec("\"C:\\Program Files\\foo\" bar")
-
-                // No chance to avoid CMD/BAT injection, except to do the work
-                // right from the beginning. Otherwise we have too many corner
-                // cases from
-                //    Runtime.getRuntime().exec(String[] cmd [, ...])
-                // calls with internal ["] and escape sequences.
-
-                // Restore original command line.
-                StringBuilder join = new StringBuilder();
-                // terminal space in command line is ok
-                for (String s : cmd)
-                    join.append(s).append(' ');
-
-                // Parse the command line again.
-                cmd = getTokensFromCommand(join.toString());
-                executablePath = getExecutablePath(cmd[0]);
-
-                // Check new executable name once more
-                if (security != null)
-                    security.checkExec(executablePath);
-            }
-
-            // Quotation protects from interpretation of the [path] argument as
-            // start of longer path with spaces. Quotation has no influence to
-            // [.exe] extension heuristic.
-            cmdstr = createCommandLine(
-                    // We need the extended verification procedure for CMD files.
-                    isShellFile(executablePath)
-                        ? VERIFICATION_CMD_BAT
-                        : VERIFICATION_WIN32,
-                    quoteString(executablePath),
-                    cmd);
-        }
-
-        handle = create(cmdstr, envblock, path,
-                        stdHandles, redirectErrorStream);
-
-        java.security.AccessController.doPrivileged(
-        new java.security.PrivilegedAction<Void>() {
-        public Void run() {
-            if (stdHandles[0] == -1L)
-                stdin_stream = ProcessBuilder.NullOutputStream.INSTANCE;
-            else {
-                FileDescriptor stdin_fd = new FileDescriptor();
-                fdAccess.setHandle(stdin_fd, stdHandles[0]);
-                stdin_stream = new BufferedOutputStream(
-                    new FileOutputStream(stdin_fd));
-            }
-
-            if (stdHandles[1] == -1L)
-                stdout_stream = ProcessBuilder.NullInputStream.INSTANCE;
-            else {
-                FileDescriptor stdout_fd = new FileDescriptor();
-                fdAccess.setHandle(stdout_fd, stdHandles[1]);
-                stdout_stream = new BufferedInputStream(
-                    new FileInputStream(stdout_fd));
-            }
-
-            if (stdHandles[2] == -1L)
-                stderr_stream = ProcessBuilder.NullInputStream.INSTANCE;
-            else {
-                FileDescriptor stderr_fd = new FileDescriptor();
-                fdAccess.setHandle(stderr_fd, stdHandles[2]);
-                stderr_stream = new FileInputStream(stderr_fd);
-            }
-
-            return null; }});
     }
 
     public OutputStream getOutputStream() {
-        return stdin_stream;
+        return stdin;
     }
 
     public InputStream getInputStream() {
-        return stdout_stream;
+        return stdout;
     }
 
     public InputStream getErrorStream() {
-        return stderr_stream;
+        return stderr;
     }
 
-    protected void finalize() {
-        closeHandle(handle);
+    public synchronized int waitFor() throws InterruptedException {
+        while (!hasExited) {
+            wait();
+        }
+        return exitcode;
     }
-
-    private static final int STILL_ACTIVE = getStillActive();
-    private static native int getStillActive();
-
-    public int exitValue() {
-        int exitCode = getExitCodeProcess(handle);
-        if (exitCode == STILL_ACTIVE)
-            throw new IllegalThreadStateException("process has not exited");
-        return exitCode;
-    }
-    private static native int getExitCodeProcess(long handle);
-
-    public int waitFor() throws InterruptedException {
-        waitForInterruptibly(handle);
-        if (Thread.interrupted())
-            throw new InterruptedException();
-        return exitValue();
-    }
-
-    private static native void waitForInterruptibly(long handle);
 
     @Override
-    public boolean waitFor(long timeout, TimeUnit unit)
+    public synchronized boolean waitFor(long timeout, TimeUnit unit)
         throws InterruptedException
     {
-        if (getExitCodeProcess(handle) != STILL_ACTIVE) return true;
+        long remainingNanos = unit.toNanos(timeout);    // throw NPE before other conditions
+        if (hasExited) return true;
         if (timeout <= 0) return false;
 
-        long remainingNanos  = unit.toNanos(timeout);
-        long deadline = System.nanoTime() + remainingNanos ;
-
+        long deadline = System.nanoTime() + remainingNanos;
         do {
-            // Round up to next millisecond
-            long msTimeout = TimeUnit.NANOSECONDS.toMillis(remainingNanos + 999_999L);
-            waitForTimeoutInterruptibly(handle, msTimeout);
-            if (Thread.interrupted())
-                throw new InterruptedException();
-            if (getExitCodeProcess(handle) != STILL_ACTIVE) {
+            TimeUnit.NANOSECONDS.timedWait(this, remainingNanos);
+            if (hasExited) {
                 return true;
             }
             remainingNanos = deadline - System.nanoTime();
         } while (remainingNanos > 0);
-
-        return (getExitCodeProcess(handle) != STILL_ACTIVE);
+        return hasExited;
     }
 
-    private static native void waitForTimeoutInterruptibly(
-        long handle, long timeout);
+    public synchronized int exitValue() {
+        if (!hasExited) {
+            throw new IllegalThreadStateException("process hasn't exited");
+        }
+        return exitcode;
+    }
 
-    public void destroy() { terminateProcess(handle); }
+    private void destroy(boolean force) {
+        switch (platform) {
+            case LINUX:
+            case BSD:
+            case AIX:
+                // There is a risk that pid will be recycled, causing us to
+                // kill the wrong process!  So we only terminate processes
+                // that appear to still be running.  Even with this check,
+                // there is an unavoidable race condition here, but the window
+                // is very small, and OSes try hard to not recycle pids too
+                // soon, so this is quite safe.
+                synchronized (this) {
+                    if (!hasExited)
+                        processHandle.destroyProcess(force);
+                }
+                try { stdin.close();  } catch (IOException ignored) {}
+                try { stdout.close(); } catch (IOException ignored) {}
+                try { stderr.close(); } catch (IOException ignored) {}
+                break;
+
+            case SOLARIS:
+                // There is a risk that pid will be recycled, causing us to
+                // kill the wrong process!  So we only terminate processes
+                // that appear to still be running.  Even with this check,
+                // there is an unavoidable race condition here, but the window
+                // is very small, and OSes try hard to not recycle pids too
+                // soon, so this is quite safe.
+                synchronized (this) {
+                    if (!hasExited)
+                        processHandle.destroyProcess(force);
+                    try {
+                        stdin.close();
+                        if (stdout_inner_stream != null)
+                            stdout_inner_stream.closeDeferred(stdout);
+                        if (stderr instanceof DeferredCloseInputStream)
+                            ((DeferredCloseInputStream) stderr)
+                                .closeDeferred(stderr);
+                    } catch (IOException e) {
+                        // ignore
+                    }
+                }
+                break;
+
+            default: throw new AssertionError("Unsupported platform: " + platform);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Process> onExit() {
+        return ProcessHandleImpl.completion(pid, false)
+                .handleAsync((unusedExitStatus, unusedThrowable) -> {
+                    boolean interrupted = false;
+                    while (true) {
+                        // Ensure that the concurrent task setting the exit status has completed
+                        try {
+                            waitFor();
+                            break;
+                        } catch (InterruptedException ie) {
+                            interrupted = true;
+                        }
+                    }
+                    if (interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return this;
+                });
+    }
+
+    @Override
+    public ProcessHandle toHandle() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new RuntimePermission("manageProcess"));
+        }
+        return processHandle;
+    }
+
+    @Override
+    public boolean supportsNormalTermination() {
+        return ProcessImpl.SUPPORTS_NORMAL_TERMINATION;
+    }
+
+    @Override
+    public void destroy() {
+        destroy(false);
+    }
 
     @Override
     public Process destroyForcibly() {
-        destroy();
+        destroy(true);
         return this;
     }
 
-    private static native void terminateProcess(long handle);
-
     @Override
-    public boolean isAlive() {
-        return isProcessAlive(handle);
+    public long pid() {
+        return pid;
     }
 
-    private static native boolean isProcessAlive(long handle);
+    @Override
+    public synchronized boolean isAlive() {
+        return !hasExited;
+    }
 
     /**
-     * Create a process using the win32 function CreateProcess.
-     * The method is synchronized due to MS kb315939 problem.
-     * All native handles should restore the inherit flag at the end of call.
+     * The {@code toString} method returns a string consisting of
+     * the native process ID of the process and the exit value of the process.
      *
-     * @param cmdstr the Windows command line
-     * @param envblock NUL-separated, double-NUL-terminated list of
-     *        environment strings in VAR=VALUE form
-     * @param dir the working directory of the process, or null if
-     *        inheriting the current directory from the parent process
-     * @param stdHandles array of windows HANDLEs.  Indexes 0, 1, and
-     *        2 correspond to standard input, standard output and
-     *        standard error, respectively.  On input, a value of -1
-     *        means to create a pipe to connect child and parent
-     *        processes.  On output, a value which is not -1 is the
-     *        parent pipe handle corresponding to the pipe which has
-     *        been created.  An element of this array is -1 on input
-     *        if and only if it is <em>not</em> -1 on output.
-     * @param redirectErrorStream redirectErrorStream attribute
-     * @return the native subprocess HANDLE returned by CreateProcess
+     * @return a string representation of the object.
      */
-    private static synchronized native long create(String cmdstr,
-                                      String envblock,
-                                      String dir,
-                                      long[] stdHandles,
-                                      boolean redirectErrorStream)
-        throws IOException;
+    @Override
+    public String toString() {
+        return new StringBuilder("Process[pid=").append(pid)
+                .append(", exitValue=").append(hasExited ? exitcode : "\"not exited\"")
+                .append("]").toString();
+    }
+
+    private static native void init();
+
+    static {
+        init();
+    }
 
     /**
-     * Opens a file for atomic append. The file is created if it doesn't
-     * already exist.
+     * A buffered input stream for a subprocess pipe file descriptor
+     * that allows the underlying file descriptor to be reclaimed when
+     * the process exits, via the processExited hook.
      *
-     * @param file the file to open or create
-     * @return the native HANDLE
+     * This is tricky because we do not want the user-level InputStream to be
+     * closed until the user invokes close(), and we need to continue to be
+     * able to read any buffered data lingering in the OS pipe buffer.
      */
-    private static native long openForAtomicAppend(String path)
-        throws IOException;
+    private static class ProcessPipeInputStream extends BufferedInputStream {
+        private final Object closeLock = new Object();
 
-    private static native boolean closeHandle(long handle);
+        ProcessPipeInputStream(int fd) {
+            super(new PipeInputStream(newFileDescriptor(fd)));
+        }
+        private static byte[] drainInputStream(InputStream in)
+                throws IOException {
+            int n = 0;
+            int j;
+            byte[] a = null;
+            while ((j = in.available()) > 0) {
+                a = (a == null) ? new byte[j] : Arrays.copyOf(a, n + j);
+                n += in.read(a, n, j);
+            }
+            return (a == null || n == a.length) ? a : Arrays.copyOf(a, n);
+        }
+
+        /** Called by the process reaper thread when the process exits. */
+        synchronized void processExited() {
+            synchronized (closeLock) {
+                try {
+                    InputStream in = this.in;
+                    // this stream is closed if and only if: in == null
+                    if (in != null) {
+                        byte[] stragglers = drainInputStream(in);
+                        in.close();
+                        this.in = (stragglers == null) ?
+                            ProcessBuilder.NullInputStream.INSTANCE :
+                            new ByteArrayInputStream(stragglers);
+                    }
+                } catch (IOException ignored) {}
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            // BufferedInputStream#close() is not synchronized unlike most other
+            // methods. Synchronizing helps avoid race with processExited().
+            synchronized (closeLock) {
+                super.close();
+            }
+        }
+    }
+
+    /**
+     * A buffered output stream for a subprocess pipe file descriptor
+     * that allows the underlying file descriptor to be reclaimed when
+     * the process exits, via the processExited hook.
+     */
+    private static class ProcessPipeOutputStream extends BufferedOutputStream {
+        ProcessPipeOutputStream(int fd) {
+            super(new FileOutputStream(newFileDescriptor(fd)));
+        }
+
+        /** Called by the process reaper thread when the process exits. */
+        synchronized void processExited() {
+            OutputStream out = this.out;
+            if (out != null) {
+                try {
+                    out.close();
+                } catch (IOException ignored) {
+                    // We know of no reason to get an IOException, but if
+                    // we do, there's nothing else to do but carry on.
+                }
+                this.out = ProcessBuilder.NullOutputStream.INSTANCE;
+            }
+        }
+    }
+
+    // A FileInputStream that supports the deferment of the actual close
+    // operation until the last pending I/O operation on the stream has
+    // finished.  This is required on Solaris because we must close the stdin
+    // and stdout streams in the destroy method in order to reclaim the
+    // underlying file descriptors.  Doing so, however, causes any thread
+    // currently blocked in a read on one of those streams to receive an
+    // IOException("Bad file number"), which is incompatible with historical
+    // behavior.  By deferring the close we allow any pending reads to see -1
+    // (EOF) as they did before.
+    //
+    private static class DeferredCloseInputStream extends PipeInputStream {
+        DeferredCloseInputStream(FileDescriptor fd) {
+            super(fd);
+        }
+
+        private Object lock = new Object();     // For the following fields
+        private boolean closePending = false;
+        private int useCount = 0;
+        private InputStream streamToClose;
+
+        private void raise() {
+            synchronized (lock) {
+                useCount++;
+            }
+        }
+
+        private void lower() throws IOException {
+            synchronized (lock) {
+                useCount--;
+                if (useCount == 0 && closePending) {
+                    streamToClose.close();
+                }
+            }
+        }
+
+        // stc is the actual stream to be closed; it might be this object, or
+        // it might be an upstream object for which this object is downstream.
+        //
+        private void closeDeferred(InputStream stc) throws IOException {
+            synchronized (lock) {
+                if (useCount == 0) {
+                    stc.close();
+                } else {
+                    closePending = true;
+                    streamToClose = stc;
+                }
+            }
+        }
+
+        public void close() throws IOException {
+            synchronized (lock) {
+                useCount = 0;
+                closePending = false;
+            }
+            super.close();
+        }
+
+        public int read() throws IOException {
+            raise();
+            try {
+                return super.read();
+            } finally {
+                lower();
+            }
+        }
+
+        public int read(byte[] b) throws IOException {
+            raise();
+            try {
+                return super.read(b);
+            } finally {
+                lower();
+            }
+        }
+
+        public int read(byte[] b, int off, int len) throws IOException {
+            raise();
+            try {
+                return super.read(b, off, len);
+            } finally {
+                lower();
+            }
+        }
+
+        public long skip(long n) throws IOException {
+            raise();
+            try {
+                return super.skip(n);
+            } finally {
+                lower();
+            }
+        }
+
+        public int available() throws IOException {
+            raise();
+            try {
+                return super.available();
+            } finally {
+                lower();
+            }
+        }
+    }
+
+    /**
+     * A buffered input stream for a subprocess pipe file descriptor
+     * that allows the underlying file descriptor to be reclaimed when
+     * the process exits, via the processExited hook.
+     *
+     * This is tricky because we do not want the user-level InputStream to be
+     * closed until the user invokes close(), and we need to continue to be
+     * able to read any buffered data lingering in the OS pipe buffer.
+     *
+     * On AIX this is especially tricky, because the 'close()' system call
+     * will block if another thread is at the same time blocked in a file
+     * operation (e.g. 'read()') on the same file descriptor. We therefore
+     * combine 'ProcessPipeInputStream' approach used on Linux and Bsd
+     * with the DeferredCloseInputStream approach used on Solaris. This means
+     * that every potentially blocking operation on the file descriptor
+     * increments a counter before it is executed and decrements it once it
+     * finishes. The 'close()' operation will only be executed if there are
+     * no pending operations. Otherwise it is deferred after the last pending
+     * operation has finished.
+     *
+     */
+    private static class DeferredCloseProcessPipeInputStream
+        extends BufferedInputStream {
+
+        private final Object closeLock = new Object();
+        private int useCount = 0;
+        private boolean closePending = false;
+
+        DeferredCloseProcessPipeInputStream(int fd) {
+            super(new PipeInputStream(newFileDescriptor(fd)));
+        }
+
+        private InputStream drainInputStream(InputStream in)
+                throws IOException {
+            int n = 0;
+            int j;
+            byte[] a = null;
+            synchronized (closeLock) {
+                if (buf == null) // asynchronous close()?
+                    return null; // discard
+                j = in.available();
+            }
+            while (j > 0) {
+                a = (a == null) ? new byte[j] : Arrays.copyOf(a, n + j);
+                synchronized (closeLock) {
+                    if (buf == null) // asynchronous close()?
+                        return null; // discard
+                    n += in.read(a, n, j);
+                    j = in.available();
+                }
+            }
+            return (a == null) ?
+                    ProcessBuilder.NullInputStream.INSTANCE :
+                    new ByteArrayInputStream(n == a.length ? a : Arrays.copyOf(a, n));
+        }
+
+        /** Called by the process reaper thread when the process exits. */
+        synchronized void processExited() {
+            try {
+                InputStream in = this.in;
+                if (in != null) {
+                    InputStream stragglers = drainInputStream(in);
+                    in.close();
+                    this.in = stragglers;
+                }
+            } catch (IOException ignored) { }
+        }
+
+        private void raise() {
+            synchronized (closeLock) {
+                useCount++;
+            }
+        }
+
+        private void lower() throws IOException {
+            synchronized (closeLock) {
+                useCount--;
+                if (useCount == 0 && closePending) {
+                    closePending = false;
+                    super.close();
+                }
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            raise();
+            try {
+                return super.read();
+            } finally {
+                lower();
+            }
+        }
+
+        @Override
+        public int read(byte[] b) throws IOException {
+            raise();
+            try {
+                return super.read(b);
+            } finally {
+                lower();
+            }
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            raise();
+            try {
+                return super.read(b, off, len);
+            } finally {
+                lower();
+            }
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            raise();
+            try {
+                return super.skip(n);
+            } finally {
+                lower();
+            }
+        }
+
+        @Override
+        public int available() throws IOException {
+            raise();
+            try {
+                return super.available();
+            } finally {
+                lower();
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            // BufferedInputStream#close() is not synchronized unlike most other
+            // methods. Synchronizing helps avoid racing with drainInputStream().
+            synchronized (closeLock) {
+                if (useCount == 0) {
+                    super.close();
+                }
+                else {
+                    closePending = true;
+                }
+            }
+        }
+    }
 }

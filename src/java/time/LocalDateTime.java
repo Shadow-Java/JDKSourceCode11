@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2007-2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -121,7 +121,7 @@ import java.util.Objects;
  * to be accurate will find the ISO-8601 approach unsuitable.
  *
  * <p>
- * This is a <a href="{@docRoot}/java/lang/doc-files/ValueBased.html">value-based</a>
+ * This is a <a href="{@docRoot}/java.base/java/lang/doc-files/ValueBased.html">value-based</a>
  * class; use of identity-sensitive operations (including reference equality
  * ({@code ==}), identity hash code, or synchronization) on instances of
  * {@code LocalDateTime} may have unpredictable results and should be avoided.
@@ -418,7 +418,7 @@ public final class LocalDateTime
         NANO_OF_SECOND.checkValidValue(nanoOfSecond);
         long localSecond = epochSecond + offset.getTotalSeconds();  // overflow caught later
         long localEpochDay = Math.floorDiv(localSecond, SECONDS_PER_DAY);
-        int secsOfDay = (int)Math.floorMod(localSecond, SECONDS_PER_DAY);
+        int secsOfDay = Math.floorMod(localSecond, SECONDS_PER_DAY);
         LocalDate date = LocalDate.ofEpochDay(localEpochDay);
         LocalTime time = LocalTime.ofNanoOfDay(secsOfDay * NANOS_PER_SECOND + nanoOfSecond);
         return new LocalDateTime(date, time);
@@ -665,7 +665,7 @@ public final class LocalDateTime
      * The {@link #isSupported(TemporalField) supported fields} will return valid
      * values based on this date-time, except {@code NANO_OF_DAY}, {@code MICRO_OF_DAY},
      * {@code EPOCH_DAY} and {@code PROLEPTIC_MONTH} which are too large to fit in
-     * an {@code int} and throw a {@code DateTimeException}.
+     * an {@code int} and throw an {@code UnsupportedTemporalTypeException}.
      * All other {@code ChronoField} instances will throw an {@code UnsupportedTemporalTypeException}.
      * <p>
      * If the field is not a {@code ChronoField}, then the result of this method
@@ -1407,8 +1407,8 @@ public final class LocalDateTime
      * </ol>
      * <p>
      * For example, 2008-02-29 (leap year) minus one year would result in the
-     * invalid date 2009-02-29 (standard year). Instead of returning an invalid
-     * result, the last valid day of the month, 2009-02-28, is selected instead.
+     * invalid date 2007-02-29 (standard year). Instead of returning an invalid
+     * result, the last valid day of the month, 2007-02-28, is selected instead.
      * <p>
      * This instance is immutable and unaffected by this method call.
      *
@@ -1431,8 +1431,8 @@ public final class LocalDateTime
      * </ol>
      * <p>
      * For example, 2007-03-31 minus one month would result in the invalid date
-     * 2007-04-31. Instead of returning an invalid result, the last valid day
-     * of the month, 2007-04-30, is selected instead.
+     * 2007-02-31. Instead of returning an invalid result, the last valid day
+     * of the month, 2007-02-28, is selected instead.
      * <p>
      * This instance is immutable and unaffected by this method call.
      *

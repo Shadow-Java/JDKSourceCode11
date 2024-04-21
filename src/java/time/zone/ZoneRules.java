@@ -1,33 +1,33 @@
 /*
  * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2009-2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -303,7 +303,6 @@ public final class ZoneRules implements Serializable {
      * Creates an instance of ZoneRules that has fixed zone rules.
      *
      * @param offset  the offset this fixed zone rules is based on, not null
-     * @return the zone rules, not null
      * @see #isFixedOffset()
      */
     private ZoneRules(ZoneOffset offset) {
@@ -614,7 +613,7 @@ public final class ZoneRules implements Serializable {
      * One technique, using this method, would be:
      * <pre>
      *  ZoneOffsetTransition trans = rules.getTransition(localDT);
-     *  if (trans == null) {
+     *  if (trans != null) {
      *    // Gap or Overlap: determine what to do from transition
      *  } else {
      *    // Normal case: only one valid offset
@@ -872,13 +871,13 @@ public final class ZoneRules implements Serializable {
     /**
      * Gets the previous transition before the specified instant.
      * <p>
-     * This returns details of the previous transition after the specified instant.
+     * This returns details of the previous transition before the specified instant.
      * For example, if the instant represents a point where "summer" daylight saving time
      * applies, then the method will return the transition from the previous "winter" time.
      *
      * @param instant  the instant to get the previous transition after, not null, but null
      *  may be ignored if the rules have a single offset for all instants
-     * @return the previous transition after the specified instant, null if this is before the first transition
+     * @return the previous transition before the specified instant, null if this is before the first transition
      */
     public ZoneOffsetTransition previousTransition(Instant instant) {
         if (savingsInstantTransitions.length == 0) {
@@ -970,7 +969,7 @@ public final class ZoneRules implements Serializable {
      * @return an immutable list of transition rules, not null
      */
     public List<ZoneOffsetTransitionRule> getTransitionRules() {
-        return Collections.unmodifiableList(Arrays.asList(lastRules));
+        return List.of(lastRules);
     }
 
     /**

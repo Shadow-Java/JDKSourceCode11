@@ -1,31 +1,33 @@
 /*
- * Copyright (c) 1994, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1994, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
 
 import java.nio.channels.FileChannel;
+import jdk.internal.misc.SharedSecrets;
+import jdk.internal.misc.JavaIOFileDescriptorAccess;
 import sun.nio.ch.FileChannelImpl;
 
 
@@ -34,7 +36,7 @@ import sun.nio.ch.FileChannelImpl;
  * <code>File</code> or to a <code>FileDescriptor</code>. Whether or not
  * a file is available or may be created depends upon the underlying
  * platform.  Some platforms, in particular, allow a file to be opened
- * for writing by only one <tt>FileOutputStream</tt> (or other
+ * for writing by only one {@code FileOutputStream} (or other
  * file-writing object) at a time.  In such situations the constructors in
  * this class will fail if the file involved is already open.
  *
@@ -42,30 +44,46 @@ import sun.nio.ch.FileChannelImpl;
  * such as image data. For writing streams of characters, consider using
  * <code>FileWriter</code>.
  *
+ * @apiNote
+ * To release resources used by this stream {@link #close} should be called
+ * directly or by try-with-resources. Subclasses are responsible for the cleanup
+ * of resources acquired by the subclass.
+ * Subclasses that override {@link #finalize} in order to perform cleanup
+ * should be modified to use alternative cleanup mechanisms such as
+ * {@link java.lang.ref.Cleaner} and remove the overriding {@code finalize} method.
+ *
+ * @implSpec
+ * If this FileOutputStream has been subclassed and the {@link #close}
+ * method has been overridden, the {@link #close} method will be
+ * called when the FileInputStream is unreachable.
+ * Otherwise, it is implementation specific how the resource cleanup described in
+ * {@link #close} is performed.
+ *
  * @author  Arthur van Hoff
  * @see     java.io.File
  * @see     java.io.FileDescriptor
  * @see     java.io.FileInputStream
  * @see     java.nio.file.Files#newOutputStream
- * @since   JDK1.0
+ * @since   1.0
  */
 public
 class FileOutputStream extends OutputStream
 {
+    /**
+     * Access to FileDescriptor internals.
+     */
+    private static final JavaIOFileDescriptorAccess fdAccess =
+        SharedSecrets.getJavaIOFileDescriptorAccess();
+
     /**
      * The system dependent file descriptor.
      */
     private final FileDescriptor fd;
 
     /**
-     * True if the file is opened for append.
-     */
-    private final boolean append;
-
-    /**
      * The associated channel, initialized lazily.
      */
-    private FileChannel channel;
+    private volatile FileChannel channel;
 
     /**
      * The path of the referenced file
@@ -74,7 +92,10 @@ class FileOutputStream extends OutputStream
     private final String path;
 
     private final Object closeLock = new Object();
-    private volatile boolean closed = false;
+
+    private volatile boolean closed;
+
+    private final Object altFinalizer;
 
     /**
      * Creates a file output stream to write to the file with the
@@ -87,6 +108,10 @@ class FileOutputStream extends OutputStream
      * If the file exists but is a directory rather than a regular file, does
      * not exist but cannot be created, or cannot be opened for any other
      * reason then a <code>FileNotFoundException</code> is thrown.
+     *
+     * @implSpec Invoking this constructor with the parameter {@code name} is
+     * equivalent to invoking {@link #FileOutputStream(String,boolean)
+     * new FileOutputStream(name, false)}.
      *
      * @param      name   the system-dependent filename
      * @exception  FileNotFoundException  if the file exists but is a directory
@@ -125,7 +150,7 @@ class FileOutputStream extends OutputStream
      *               <code>checkWrite</code> method denies write access
      *               to the file.
      * @see        java.lang.SecurityManager#checkWrite(java.lang.String)
-     * @since     JDK1.1
+     * @since     1.1
      */
     public FileOutputStream(String name, boolean append)
         throws FileNotFoundException
@@ -207,10 +232,13 @@ class FileOutputStream extends OutputStream
         }
         this.fd = new FileDescriptor();
         fd.attach(this);
-        this.append = append;
         this.path = name;
 
         open(name, append);
+        altFinalizer = getFinalizer(this);
+        if (altFinalizer == null) {
+            FileCleanable.register(fd);   // open sets the fd, register the cleanup
+        }
     }
 
     /**
@@ -245,8 +273,8 @@ class FileOutputStream extends OutputStream
             security.checkWrite(fdObj);
         }
         this.fd = fdObj;
-        this.append = false;
         this.path = null;
+        this.altFinalizer = null;
 
         fd.attach(this);
     }
@@ -287,7 +315,7 @@ class FileOutputStream extends OutputStream
      * @exception  IOException  if an I/O error occurs.
      */
     public void write(int b) throws IOException {
-        write(b, append);
+        write(b, fdAccess.getAppend(fd));
     }
 
     /**
@@ -310,7 +338,7 @@ class FileOutputStream extends OutputStream
      * @exception  IOException  if an I/O error occurs.
      */
     public void write(byte b[]) throws IOException {
-        writeBytes(b, 0, b.length, append);
+        writeBytes(b, 0, b.length, fdAccess.getAppend(fd));
     }
 
     /**
@@ -323,7 +351,7 @@ class FileOutputStream extends OutputStream
      * @exception  IOException  if an I/O error occurs.
      */
     public void write(byte b[], int off, int len) throws IOException {
-        writeBytes(b, off, len, append);
+        writeBytes(b, off, len, fdAccess.getAppend(fd));
     }
 
     /**
@@ -334,12 +362,23 @@ class FileOutputStream extends OutputStream
      * <p> If this stream has an associated channel then the channel is closed
      * as well.
      *
+     * @apiNote
+     * Overriding {@link #close} to perform cleanup actions is reliable
+     * only when called directly or when called by try-with-resources.
+     * Do not depend on finalization to invoke {@code close};
+     * finalization is not reliable and is deprecated.
+     * If cleanup of native resources is needed, other mechanisms such as
+     * {@linkplain java.lang.ref.Cleaner} should be used.
+     *
      * @exception  IOException  if an I/O error occurs.
      *
      * @revised 1.4
      * @spec JSR-51
      */
     public void close() throws IOException {
+        if (closed) {
+            return;
+        }
         synchronized (closeLock) {
             if (closed) {
                 return;
@@ -347,13 +386,16 @@ class FileOutputStream extends OutputStream
             closed = true;
         }
 
-        if (channel != null) {
-            channel.close();
+        FileChannel fc = channel;
+        if (fc != null) {
+            // possible race with getChannel(), benign since
+            // FileChannel.close is final and idempotent
+            fc.close();
         }
 
         fd.closeAll(new Closeable() {
             public void close() throws IOException {
-               close0();
+               fd.close();
            }
         });
     }
@@ -393,43 +435,120 @@ class FileOutputStream extends OutputStream
      * @spec JSR-51
      */
     public FileChannel getChannel() {
-        synchronized (this) {
-            if (channel == null) {
-                channel = FileChannelImpl.open(fd, path, false, true, append, this);
+        FileChannel fc = this.channel;
+        if (fc == null) {
+            synchronized (this) {
+                fc = this.channel;
+                if (fc == null) {
+                    this.channel = fc = FileChannelImpl.open(fd, path, false,
+                        true, false, this);
+                    if (closed) {
+                        try {
+                            // possible race with close(), benign since
+                            // FileChannel.close is final and idempotent
+                            fc.close();
+                        } catch (IOException ioe) {
+                            throw new InternalError(ioe); // should not happen
+                        }
+                    }
+                }
             }
-            return channel;
         }
+        return fc;
     }
 
     /**
      * Cleans up the connection to the file, and ensures that the
-     * <code>close</code> method of this file output stream is
+     * {@link #close} method of this file output stream is
      * called when there are no more references to this stream.
+     * The {@link #finalize} method does not call {@link #close} directly.
+     *
+     * @apiNote
+     * To release resources used by this stream {@link #close} should be called
+     * directly or by try-with-resources.
+     *
+     * @implSpec
+     * If this FileOutputStream has been subclassed and the {@link #close}
+     * method has been overridden, the {@link #close} method will be
+     * called when the FileOutputStream is unreachable.
+     * Otherwise, it is implementation specific how the resource cleanup described in
+     * {@link #close} is performed.
+     *
+     * @deprecated The {@code finalize} method has been deprecated and will be removed.
+     *     Subclasses that override {@code finalize} in order to perform cleanup
+     *     should be modified to use alternative cleanup mechanisms and
+     *     to remove the overriding {@code finalize} method.
+     *     When overriding the {@code finalize} method, its implementation must explicitly
+     *     ensure that {@code super.finalize()} is invoked as described in {@link Object#finalize}.
+     *     See the specification for {@link Object#finalize()} for further
+     *     information about migration options.
      *
      * @exception  IOException  if an I/O error occurs.
      * @see        java.io.FileInputStream#close()
      */
+    @Deprecated(since="9", forRemoval = true)
     protected void finalize() throws IOException {
-        if (fd != null) {
-            if (fd == FileDescriptor.out || fd == FileDescriptor.err) {
-                flush();
-            } else {
-                /* if fd is shared, the references in FileDescriptor
-                 * will ensure that finalizer is only called when
-                 * safe to do so. All references using the fd have
-                 * become unreachable. We can call close()
-                 */
-                close();
-            }
-        }
     }
-
-    private native void close0() throws IOException;
 
     private static native void initIDs();
 
     static {
         initIDs();
+    }
+
+    /*
+     * Returns a finalizer object if the FOS needs a finalizer; otherwise null.
+     * If the FOS has a close method; it needs an AltFinalizer.
+     */
+    private static Object getFinalizer(FileOutputStream fos) {
+        Class<?> clazz = fos.getClass();
+        while (clazz != FileOutputStream.class) {
+            try {
+                clazz.getDeclaredMethod("close");
+                return new AltFinalizer(fos);
+            } catch (NoSuchMethodException nsme) {
+                // ignore
+            }
+            clazz = clazz.getSuperclass();
+        }
+        return null;
+    }
+
+    /**
+     * Class to call {@code FileOutputStream.close} when finalized.
+     * If finalization of the stream is needed, an instance is created
+     * in its constructor(s).  When the set of instances
+     * related to the stream is unreachable, the AltFinalizer performs
+     * the needed call to the stream's {@code close} method.
+     */
+    static class AltFinalizer {
+        private final FileOutputStream fos;
+
+        AltFinalizer(FileOutputStream fos) {
+            this.fos = fos;
+        }
+
+        @Override
+        @SuppressWarnings("deprecation")
+        protected final void finalize() {
+            try {
+                if (fos.fd != null) {
+                    if (fos.fd == FileDescriptor.out || fos.fd == FileDescriptor.err) {
+                        // Subclass may override flush; otherwise it is no-op
+                        fos.flush();
+                    } else {
+                        /* if fd is shared, the references in FileDescriptor
+                         * will ensure that finalizer is only called when
+                         * safe to do so. All references using the fd have
+                         * become unreachable. We can call close()
+                         */
+                        fos.close();
+                    }
+                }
+            } catch (IOException ioe) {
+                // ignore
+            }
+        }
     }
 
 }

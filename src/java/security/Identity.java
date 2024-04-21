@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2015, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -51,12 +51,14 @@ import java.util.*;
  * @see Principal
  *
  * @author Benjamin Renaud
- * @deprecated This class is no longer used. Its functionality has been
- * replaced by {@code java.security.KeyStore}, the
- * {@code java.security.cert} package, and
- * {@code java.security.Principal}.
+ * @since 1.1
+ * @deprecated This class is deprecated and subject to removal in a future
+ *     version of Java SE. It has been replaced by
+ *     {@code java.security.KeyStore}, the {@code java.security.cert} package,
+ *     and {@code java.security.Principal}.
  */
-@Deprecated
+@Deprecated(since="1.2", forRemoval=true)
+@SuppressWarnings("removal")
 public abstract class Identity implements Principal, Serializable {
 
     /** use serialVersionUID from JDK 1.1.x for interoperability */
@@ -185,7 +187,7 @@ public abstract class Identity implements Principal, Serializable {
 
         check("setIdentityPublicKey");
         this.publicKey = key;
-        certificates = new Vector<Certificate>();
+        certificates = new Vector<>();
     }
 
     /**
@@ -248,7 +250,7 @@ public abstract class Identity implements Principal, Serializable {
         check("addIdentityCertificate");
 
         if (certificates == null) {
-            certificates = new Vector<Certificate>();
+            certificates = new Vector<>();
         }
         if (publicKey != null) {
             if (!keyEquals(publicKey, certificate.getPublicKey())) {

@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -34,8 +34,10 @@
  */
 
 package java.util.concurrent.locks;
-import java.util.concurrent.TimeUnit;
+
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
+import jdk.internal.vm.annotation.ReservedStackAccess;
 
 /**
  * A reentrant mutual exclusion {@link Lock} with the same basic
@@ -72,7 +74,7 @@ import java.util.Collection;
  * follow a call to {@code lock} with a {@code try} block, most
  * typically in a before/after construction such as:
  *
- *  <pre> {@code
+ * <pre> {@code
  * class X {
  *   private final ReentrantLock lock = new ReentrantLock();
  *   // ...
@@ -117,15 +119,10 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         private static final long serialVersionUID = -5179523762034025860L;
 
         /**
-         * Performs {@link Lock#lock}. The main reason for subclassing
-         * is to allow fast path for nonfair version.
-         */
-        abstract void lock();
-
-        /**
          * Performs non-fair tryLock.  tryAcquire is implemented in
          * subclasses, but both need nonfair try for trylock method.
          */
+        @ReservedStackAccess
         final boolean nonfairTryAcquire(int acquires) {
             final Thread current = Thread.currentThread();
             int c = getState();
@@ -145,6 +142,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
             return false;
         }
 
+        @ReservedStackAccess
         protected final boolean tryRelease(int releases) {
             int c = getState() - releases;
             if (Thread.currentThread() != getExclusiveOwnerThread())
@@ -197,18 +195,6 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      */
     static final class NonfairSync extends Sync {
         private static final long serialVersionUID = 7316153563782823691L;
-
-        /**
-         * Performs lock.  Try immediate barge, backing up to normal
-         * acquire on failure.
-         */
-        final void lock() {
-            if (compareAndSetState(0, 1))
-                setExclusiveOwnerThread(Thread.currentThread());
-            else
-                acquire(1);
-        }
-
         protected final boolean tryAcquire(int acquires) {
             return nonfairTryAcquire(acquires);
         }
@@ -219,15 +205,11 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      */
     static final class FairSync extends Sync {
         private static final long serialVersionUID = -3000897897090466540L;
-
-        final void lock() {
-            acquire(1);
-        }
-
         /**
          * Fair version of tryAcquire.  Don't grant access unless
          * recursive call or no waiters or is first.
          */
+        @ReservedStackAccess
         protected final boolean tryAcquire(int acquires) {
             final Thread current = Thread.currentThread();
             int c = getState();
@@ -282,7 +264,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * at which time the lock hold count is set to one.
      */
     public void lock() {
-        sync.lock();
+        sync.acquire(1);
     }
 
     /**
@@ -348,7 +330,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * This &quot;barging&quot; behavior can be useful in certain
      * circumstances, even though it breaks fairness. If you want to honor
      * the fairness setting for this lock, then use
-     * {@link #tryLock(long, TimeUnit) tryLock(0, TimeUnit.SECONDS) }
+     * {@link #tryLock(long, TimeUnit) tryLock(0, TimeUnit.SECONDS)}
      * which is almost equivalent (it also detects interruption).
      *
      * <p>If the current thread already holds this lock then the hold
@@ -378,7 +360,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * method. If you want a timed {@code tryLock} that does permit barging on
      * a fair lock then combine the timed and un-timed forms together:
      *
-     *  <pre> {@code
+     * <pre> {@code
      * if (lock.tryLock() ||
      *     lock.tryLock(timeout, unit)) {
      *   ...
@@ -484,7 +466,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * InterruptedException} will be thrown, and the thread's
      * interrupted status will be cleared.
      *
-     * <li> Waiting threads are signalled in FIFO order.
+     * <li>Waiting threads are signalled in FIFO order.
      *
      * <li>The ordering of lock reacquisition for threads returning
      * from waiting methods is the same as for threads initially
@@ -511,7 +493,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * not be entered with the lock already held then we can assert that
      * fact:
      *
-     *  <pre> {@code
+     * <pre> {@code
      * class X {
      *   ReentrantLock lock = new ReentrantLock();
      *   // ...
@@ -541,7 +523,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * debugging and testing. For example, a method that should only be
      * called while a lock is held can assert that this is the case:
      *
-     *  <pre> {@code
+     * <pre> {@code
      * class X {
      *   ReentrantLock lock = new ReentrantLock();
      *   // ...
@@ -555,7 +537,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
      * <p>It can also be used to ensure that a reentrant lock is used
      * in a non-reentrant manner, for example:
      *
-     *  <pre> {@code
+     * <pre> {@code
      * class X {
      *   ReentrantLock lock = new ReentrantLock();
      *   // ...
@@ -646,12 +628,11 @@ public class ReentrantLock implements Lock, java.io.Serializable {
     }
 
     /**
-     * Returns an estimate of the number of threads waiting to
-     * acquire this lock.  The value is only an estimate because the number of
+     * Returns an estimate of the number of threads waiting to acquire
+     * this lock.  The value is only an estimate because the number of
      * threads may change dynamically while this method traverses
      * internal data structures.  This method is designed for use in
-     * monitoring of the system state, not for synchronization
-     * control.
+     * monitoring system state, not for synchronization control.
      *
      * @return the estimated number of threads waiting for this lock
      */

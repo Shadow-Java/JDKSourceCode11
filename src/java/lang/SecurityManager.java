@@ -1,45 +1,57 @@
 /*
- * Copyright (c) 1995, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1995, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang;
 
-import java.security.*;
+import java.lang.module.ModuleDescriptor;
+import java.lang.module.ModuleDescriptor.Exports;
+import java.lang.module.ModuleDescriptor.Opens;
+import java.lang.module.ModuleReference;
+import java.lang.reflect.Member;
 import java.io.FileDescriptor;
 import java.io.File;
 import java.io.FilePermission;
-import java.awt.AWTPermission;
-import java.util.PropertyPermission;
-import java.lang.RuntimePermission;
-import java.net.SocketPermission;
-import java.net.NetPermission;
-import java.util.Hashtable;
 import java.net.InetAddress;
-import java.lang.reflect.*;
-import java.net.URL;
+import java.net.SocketPermission;
+import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.Permission;
+import java.security.PrivilegedAction;
+import java.security.Security;
+import java.security.SecurityPermission;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.PropertyPermission;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
-import sun.reflect.CallerSensitive;
+import jdk.internal.module.ModuleBootstrap;
+import jdk.internal.module.ModuleLoaderMap;
+import jdk.internal.reflect.CallerSensitive;
 import sun.security.util.SecurityConstants;
 
 /**
@@ -67,9 +79,7 @@ import sun.security.util.SecurityConstants;
  * completion of the operation by throwing an exception. A security
  * manager routine simply returns if the operation is permitted, but
  * throws a <code>SecurityException</code> if the operation is not
- * permitted. The only exception to this convention is
- * <code>checkTopLevelWindow</code>, which returns a
- * <code>boolean</code> value.
+ * permitted.
  * <p>
  * The current security manager is set by the
  * <code>setSecurityManager</code> method in class
@@ -91,7 +101,7 @@ import sun.security.util.SecurityConstants;
  * <code>checkPermission</code> returns quietly. If denied, a
  * <code>SecurityException</code> is thrown.
  * <p>
- * As of Java 2 SDK v1.2, the default implementation of each of the other
+ * The default implementation of each of the other
  * <code>check</code> methods in <code>SecurityManager</code> is to
  * call the <code>SecurityManager checkPermission</code> method
  * to determine if the calling thread has permission to perform the requested
@@ -184,26 +194,21 @@ import sun.security.util.SecurityConstants;
  * of system administrators who might need to perform multiple
  * tasks that require all (or numerous) permissions.
  * <p>
- * See <a href ="../../../technotes/guides/security/permissions.html">
- * Permissions in the JDK</a> for permission-related information.
- * This document includes, for example, a table listing the various SecurityManager
+ * See {@extLink security_guide_permissions
+ * Permissions in the Java Development Kit (JDK)}
+ * for permission-related information.
+ * This document includes a table listing the various SecurityManager
  * <code>check</code> methods and the permission(s) the default
  * implementation of each such method requires.
- * It also contains a table of all the version 1.2 methods
+ * It also contains a table of the methods
  * that require permissions, and for each such method tells
  * which permission it requires.
- * <p>
- * For more information about <code>SecurityManager</code> changes made in
- * the JDK and advice regarding porting of 1.1-style security managers,
- * see the <a href="../../../technotes/guides/security/index.html">security documentation</a>.
  *
  * @author  Arthur van Hoff
  * @author  Roland Schemers
  *
  * @see     java.lang.ClassLoader
  * @see     java.lang.SecurityException
- * @see     java.lang.SecurityManager#checkTopLevelWindow(java.lang.Object)
- *  checkTopLevelWindow
  * @see     java.lang.System#getSecurityManager() getSecurityManager
  * @see     java.lang.System#setSecurityManager(java.lang.SecurityManager)
  *  setSecurityManager
@@ -221,57 +226,14 @@ import sun.security.util.SecurityConstants;
  * @see     java.security.SecurityPermission SecurityPermission
  * @see     java.security.ProtectionDomain
  *
- * @since   JDK1.0
+ * @since   1.0
  */
-public
-class SecurityManager {
-
-    /**
-     * This field is <code>true</code> if there is a security check in
-     * progress; <code>false</code> otherwise.
-     *
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     */
-    @Deprecated
-    protected boolean inCheck;
+public class SecurityManager {
 
     /*
      * Have we been initialized. Effective against finalizer attacks.
      */
     private boolean initialized = false;
-
-
-    /**
-     * returns true if the current context has been granted AllPermission
-     */
-    private boolean hasAllPermission()
-    {
-        try {
-            checkPermission(SecurityConstants.ALL_PERMISSION);
-            return true;
-        } catch (SecurityException se) {
-            return false;
-        }
-    }
-
-    /**
-     * Tests if there is a security check in progress.
-     *
-     * @return the value of the <code>inCheck</code> field. This field
-     *          should contain <code>true</code> if a security check is
-     *          in progress,
-     *          <code>false</code> otherwise.
-     * @see     java.lang.SecurityManager#inCheck
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     */
-    @Deprecated
-    public boolean getInCheck() {
-        return inCheck;
-    }
 
     /**
      * Constructs a new <code>SecurityManager</code>.
@@ -313,196 +275,7 @@ class SecurityManager {
      *
      * @return  the execution stack.
      */
-    protected native Class[] getClassContext();
-
-    /**
-     * Returns the class loader of the most recently executing method from
-     * a class defined using a non-system class loader. A non-system
-     * class loader is defined as being a class loader that is not equal to
-     * the system class loader (as returned
-     * by {@link ClassLoader#getSystemClassLoader}) or one of its ancestors.
-     * <p>
-     * This method will return
-     * <code>null</code> in the following three cases:
-     * <ol>
-     *   <li>All methods on the execution stack are from classes
-     *   defined using the system class loader or one of its ancestors.
-     *
-     *   <li>All methods on the execution stack up to the first
-     *   "privileged" caller
-     *   (see {@link java.security.AccessController#doPrivileged})
-     *   are from classes
-     *   defined using the system class loader or one of its ancestors.
-     *
-     *   <li> A call to <code>checkPermission</code> with
-     *   <code>java.security.AllPermission</code> does not
-     *   result in a SecurityException.
-     *
-     * </ol>
-     *
-     * @return  the class loader of the most recent occurrence on the stack
-     *          of a method from a class defined using a non-system class
-     *          loader.
-     *
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     *
-     * @see  java.lang.ClassLoader#getSystemClassLoader() getSystemClassLoader
-     * @see  #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    protected ClassLoader currentClassLoader()
-    {
-        ClassLoader cl = currentClassLoader0();
-        if ((cl != null) && hasAllPermission())
-            cl = null;
-        return cl;
-    }
-
-    private native ClassLoader currentClassLoader0();
-
-    /**
-     * Returns the class of the most recently executing method from
-     * a class defined using a non-system class loader. A non-system
-     * class loader is defined as being a class loader that is not equal to
-     * the system class loader (as returned
-     * by {@link ClassLoader#getSystemClassLoader}) or one of its ancestors.
-     * <p>
-     * This method will return
-     * <code>null</code> in the following three cases:
-     * <ol>
-     *   <li>All methods on the execution stack are from classes
-     *   defined using the system class loader or one of its ancestors.
-     *
-     *   <li>All methods on the execution stack up to the first
-     *   "privileged" caller
-     *   (see {@link java.security.AccessController#doPrivileged})
-     *   are from classes
-     *   defined using the system class loader or one of its ancestors.
-     *
-     *   <li> A call to <code>checkPermission</code> with
-     *   <code>java.security.AllPermission</code> does not
-     *   result in a SecurityException.
-     *
-     * </ol>
-     *
-     * @return  the class  of the most recent occurrence on the stack
-     *          of a method from a class defined using a non-system class
-     *          loader.
-     *
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     *
-     * @see  java.lang.ClassLoader#getSystemClassLoader() getSystemClassLoader
-     * @see  #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    protected Class<?> currentLoadedClass() {
-        Class<?> c = currentLoadedClass0();
-        if ((c != null) && hasAllPermission())
-            c = null;
-        return c;
-    }
-
-    /**
-     * Returns the stack depth of the specified class.
-     *
-     * @param   name   the fully qualified name of the class to search for.
-     * @return  the depth on the stack frame of the first occurrence of a
-     *          method from a class with the specified name;
-     *          <code>-1</code> if such a frame cannot be found.
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     *
-     */
-    @Deprecated
-    protected native int classDepth(String name);
-
-    /**
-     * Returns the stack depth of the most recently executing method
-     * from a class defined using a non-system class loader.  A non-system
-     * class loader is defined as being a class loader that is not equal to
-     * the system class loader (as returned
-     * by {@link ClassLoader#getSystemClassLoader}) or one of its ancestors.
-     * <p>
-     * This method will return
-     * -1 in the following three cases:
-     * <ol>
-     *   <li>All methods on the execution stack are from classes
-     *   defined using the system class loader or one of its ancestors.
-     *
-     *   <li>All methods on the execution stack up to the first
-     *   "privileged" caller
-     *   (see {@link java.security.AccessController#doPrivileged})
-     *   are from classes
-     *   defined using the system class loader or one of its ancestors.
-     *
-     *   <li> A call to <code>checkPermission</code> with
-     *   <code>java.security.AllPermission</code> does not
-     *   result in a SecurityException.
-     *
-     * </ol>
-     *
-     * @return the depth on the stack frame of the most recent occurrence of
-     *          a method from a class defined using a non-system class loader.
-     *
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     *
-     * @see   java.lang.ClassLoader#getSystemClassLoader() getSystemClassLoader
-     * @see   #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    protected int classLoaderDepth()
-    {
-        int depth = classLoaderDepth0();
-        if (depth != -1) {
-            if (hasAllPermission())
-                depth = -1;
-            else
-                depth--; // make sure we don't include ourself
-        }
-        return depth;
-    }
-
-    private native int classLoaderDepth0();
-
-    /**
-     * Tests if a method from a class with the specified
-     *         name is on the execution stack.
-     *
-     * @param  name   the fully qualified name of the class.
-     * @return <code>true</code> if a method from a class with the specified
-     *         name is on the execution stack; <code>false</code> otherwise.
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     */
-    @Deprecated
-    protected boolean inClass(String name) {
-        return classDepth(name) >= 0;
-    }
-
-    /**
-     * Basically, tests if a method from a class defined using a
-     *          class loader is on the execution stack.
-     *
-     * @return  <code>true</code> if a call to <code>currentClassLoader</code>
-     *          has a non-null return value.
-     *
-     * @deprecated This type of security checking is not recommended.
-     *  It is recommended that the <code>checkPermission</code>
-     *  call be used instead.
-     * @see        #currentClassLoader() currentClassLoader
-     */
-    @Deprecated
-    protected boolean inClassLoader() {
-        return currentClassLoader() != null;
-    }
+    protected native Class<?>[] getClassContext();
 
     /**
      * Creates an object that encapsulates the current execution
@@ -1187,7 +960,7 @@ class SecurityManager {
      *  use (join/leave/send/receive) IP multicast.
      * @exception  NullPointerException if the address argument is
      *             <code>null</code>.
-     * @since      JDK1.1
+     * @since      1.1
      * @see        #checkPermission(java.security.Permission) checkPermission
      */
     public void checkMulticast(InetAddress maddr) {
@@ -1221,11 +994,11 @@ class SecurityManager {
      *  use (join/leave/send/receive) IP multicast.
      * @exception  NullPointerException if the address argument is
      *             <code>null</code>.
-     * @since      JDK1.1
+     * @since      1.1
      * @deprecated Use #checkPermission(java.security.Permission) instead
      * @see        #checkPermission(java.security.Permission) checkPermission
      */
-    @Deprecated
+    @Deprecated(since="1.4")
     public void checkMulticast(InetAddress maddr, byte ttl) {
         String host = maddr.getHostAddress();
         if (!host.startsWith("[") && host.indexOf(':') != -1) {
@@ -1250,7 +1023,6 @@ class SecurityManager {
      * <code>super.checkPropertiesAccess</code>
      * at the point the overridden method would normally throw an
      * exception.
-     * <p>
      *
      * @exception  SecurityException  if the calling thread does not have
      *             permission to access or modify the system properties.
@@ -1296,66 +1068,6 @@ class SecurityManager {
     }
 
     /**
-     * Returns <code>false</code> if the calling
-     * thread is not trusted to bring up the top-level window indicated
-     * by the <code>window</code> argument. In this case, the caller can
-     * still decide to show the window, but the window should include
-     * some sort of visual warning. If the method returns
-     * <code>true</code>, then the window can be shown without any
-     * special restrictions.
-     * <p>
-     * See class <code>Window</code> for more information on trusted and
-     * untrusted windows.
-     * <p>
-     * This method calls
-     * <code>checkPermission</code> with the
-     * <code>AWTPermission("showWindowWithoutWarningBanner")</code> permission,
-     * and returns <code>true</code> if a SecurityException is not thrown,
-     * otherwise it returns <code>false</code>.
-     * In the case of subset Profiles of Java SE that do not include the
-     * {@code java.awt} package, {@code checkPermission} is instead called
-     * to check the permission {@code java.security.AllPermission}.
-     * <p>
-     * If you override this method, then you should make a call to
-     * <code>super.checkTopLevelWindow</code>
-     * at the point the overridden method would normally return
-     * <code>false</code>, and the value of
-     * <code>super.checkTopLevelWindow</code> should
-     * be returned.
-     *
-     * @param      window   the new window that is being created.
-     * @return     <code>true</code> if the calling thread is trusted to put up
-     *             top-level windows; <code>false</code> otherwise.
-     * @exception  NullPointerException if the <code>window</code> argument is
-     *             <code>null</code>.
-     * @deprecated The dependency on {@code AWTPermission} creates an
-     *             impediment to future modularization of the Java platform.
-     *             Users of this method should instead invoke
-     *             {@link #checkPermission} directly.
-     *             This method will be changed in a future release to check
-     *             the permission {@code java.security.AllPermission}.
-     * @see        java.awt.Window
-     * @see        #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    public boolean checkTopLevelWindow(Object window) {
-        if (window == null) {
-            throw new NullPointerException("window can't be null");
-        }
-        Permission perm = SecurityConstants.AWT.TOPLEVEL_WINDOW_PERMISSION;
-        if (perm == null) {
-            perm = SecurityConstants.ALL_PERMISSION;
-        }
-        try {
-            checkPermission(perm);
-            return true;
-        } catch (SecurityException se) {
-            // just return false
-        }
-        return false;
-    }
-
-    /**
      * Throws a <code>SecurityException</code> if the
      * calling thread is not allowed to initiate a print job request.
      * <p>
@@ -1367,87 +1079,14 @@ class SecurityManager {
      * <code>super.checkPrintJobAccess</code>
      * at the point the overridden method would normally throw an
      * exception.
-     * <p>
      *
      * @exception  SecurityException  if the calling thread does not have
      *             permission to initiate a print job request.
-     * @since   JDK1.1
+     * @since   1.1
      * @see        #checkPermission(java.security.Permission) checkPermission
      */
     public void checkPrintJobAccess() {
         checkPermission(new RuntimePermission("queuePrintJob"));
-    }
-
-    /**
-     * Throws a <code>SecurityException</code> if the
-     * calling thread is not allowed to access the system clipboard.
-     * <p>
-     * This method calls <code>checkPermission</code> with the
-     * <code>AWTPermission("accessClipboard")</code>
-     * permission.
-     * In the case of subset Profiles of Java SE that do not include the
-     * {@code java.awt} package, {@code checkPermission} is instead called
-     * to check the permission {@code java.security.AllPermission}.
-     * <p>
-     * If you override this method, then you should make a call to
-     * <code>super.checkSystemClipboardAccess</code>
-     * at the point the overridden method would normally throw an
-     * exception.
-     *
-     * @since   JDK1.1
-     * @exception  SecurityException  if the calling thread does not have
-     *             permission to access the system clipboard.
-     * @deprecated The dependency on {@code AWTPermission} creates an
-     *             impediment to future modularization of the Java platform.
-     *             Users of this method should instead invoke
-     *             {@link #checkPermission} directly.
-     *             This method will be changed in a future release to check
-     *             the permission {@code java.security.AllPermission}.
-     * @see        #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    public void checkSystemClipboardAccess() {
-        Permission perm = SecurityConstants.AWT.ACCESS_CLIPBOARD_PERMISSION;
-        if (perm == null) {
-            perm = SecurityConstants.ALL_PERMISSION;
-        }
-        checkPermission(perm);
-    }
-
-    /**
-     * Throws a <code>SecurityException</code> if the
-     * calling thread is not allowed to access the AWT event queue.
-     * <p>
-     * This method calls <code>checkPermission</code> with the
-     * <code>AWTPermission("accessEventQueue")</code> permission.
-     * In the case of subset Profiles of Java SE that do not include the
-     * {@code java.awt} package, {@code checkPermission} is instead called
-     * to check the permission {@code java.security.AllPermission}.
-     *
-     * <p>
-     * If you override this method, then you should make a call to
-     * <code>super.checkAwtEventQueueAccess</code>
-     * at the point the overridden method would normally throw an
-     * exception.
-     *
-     * @since   JDK1.1
-     * @exception  SecurityException  if the calling thread does not have
-     *             permission to access the AWT event queue.
-     * @deprecated The dependency on {@code AWTPermission} creates an
-     *             impediment to future modularization of the Java platform.
-     *             Users of this method should instead invoke
-     *             {@link #checkPermission} directly.
-     *             This method will be changed in a future release to check
-     *             the permission {@code java.security.AllPermission}.
-     * @see        #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    public void checkAwtEventQueueAccess() {
-        Permission perm = SecurityConstants.AWT.CHECK_AWT_EVENTQUEUE_PERMISSION;
-        if (perm == null) {
-            perm = SecurityConstants.ALL_PERMISSION;
-        }
-        checkPermission(perm);
     }
 
     /*
@@ -1490,49 +1129,118 @@ class SecurityManager {
             }
         }
 
-        if (packages == null)
+        if (packages == null) {
             packages = new String[0];
+        }
         return packages;
     }
 
+    // The non-exported packages in modules defined to the boot or platform
+    // class loaders. A non-exported package is a package that is not exported
+    // or is only exported to specific modules.
+    private static final Map<String, Boolean> nonExportedPkgs = new ConcurrentHashMap<>();
+    static {
+        addNonExportedPackages(ModuleLayer.boot());
+    }
+
     /**
-     * Throws a <code>SecurityException</code> if the
-     * calling thread is not allowed to access the package specified by
-     * the argument.
+     * Record the non-exported packages of the modules in the given layer
+     */
+    static void addNonExportedPackages(ModuleLayer layer) {
+        Set<String> bootModules = ModuleLoaderMap.bootModules();
+        Set<String> platformModules = ModuleLoaderMap.platformModules();
+        layer.modules().stream()
+                .map(Module::getDescriptor)
+                .filter(md -> bootModules.contains(md.name())
+                        || platformModules.contains(md.name()))
+                .map(SecurityManager::nonExportedPkgs)
+                .flatMap(Set::stream)
+                .forEach(pn -> nonExportedPkgs.put(pn, Boolean.TRUE));
+    }
+
+
+    /**
+     * Called by java.security.Security
+     */
+    static void invalidatePackageAccessCache() {
+        synchronized (packageAccessLock) {
+            packageAccessValid = false;
+        }
+        synchronized (packageDefinitionLock) {
+            packageDefinitionValid = false;
+        }
+    }
+
+    /**
+     * Returns the non-exported packages of the specified module.
+     */
+    private static Set<String> nonExportedPkgs(ModuleDescriptor md) {
+        // start with all packages in the module
+        Set<String> pkgs = new HashSet<>(md.packages());
+
+        // remove the non-qualified exported packages
+        md.exports().stream()
+                    .filter(p -> !p.isQualified())
+                    .map(Exports::source)
+                    .forEach(pkgs::remove);
+
+        // remove the non-qualified open packages
+        md.opens().stream()
+                  .filter(p -> !p.isQualified())
+                  .map(Opens::source)
+                  .forEach(pkgs::remove);
+
+        return pkgs;
+    }
+
+    /**
+     * Throws a {@code SecurityException} if the calling thread is not allowed
+     * to access the specified package.
      * <p>
-     * This method is used by the <code>loadClass</code> method of class
-     * loaders.
+     * During class loading, this method may be called by the {@code loadClass}
+     * method of class loaders and by the Java Virtual Machine to ensure that
+     * the caller is allowed to access the package of the class that is
+     * being loaded.
      * <p>
-     * This method first gets a list of
-     * restricted packages by obtaining a comma-separated list from
-     * a call to
-     * <code>java.security.Security.getProperty("package.access")</code>,
-     * and checks to see if <code>pkg</code> starts with or equals
-     * any of the restricted packages. If it does, then
-     * <code>checkPermission</code> gets called with the
-     * <code>RuntimePermission("accessClassInPackage."+pkg)</code>
-     * permission.
+     * This method checks if the specified package starts with or equals
+     * any of the packages in the {@code package.access} Security Property.
+     * An implementation may also check the package against an additional
+     * list of restricted packages as noted below. If the package is restricted,
+     * {@link #checkPermission(Permission)} is called with a
+     * {@code RuntimePermission("accessClassInPackage."+pkg)} permission.
      * <p>
-     * If this method is overridden, then
-     * <code>super.checkPackageAccess</code> should be called
-     * as the first line in the overridden method.
+     * If this method is overridden, then {@code super.checkPackageAccess}
+     * should be called as the first line in the overridden method.
+     *
+     * @implNote
+     * This implementation also restricts all non-exported packages of modules
+     * loaded by {@linkplain ClassLoader#getPlatformClassLoader
+     * the platform class loader} or its ancestors. A "non-exported package"
+     * refers to a package that is not exported to all modules. Specifically,
+     * it refers to a package that either is not exported at all by its
+     * containing module or is exported in a qualified fashion by its
+     * containing module.
      *
      * @param      pkg   the package name.
-     * @exception  SecurityException  if the calling thread does not have
+     * @throws     SecurityException  if the calling thread does not have
      *             permission to access the specified package.
-     * @exception  NullPointerException if the package name argument is
-     *             <code>null</code>.
-     * @see        java.lang.ClassLoader#loadClass(java.lang.String, boolean)
-     *  loadClass
+     * @throws     NullPointerException if the package name argument is
+     *             {@code null}.
+     * @see        java.lang.ClassLoader#loadClass(String, boolean) loadClass
      * @see        java.security.Security#getProperty getProperty
-     * @see        #checkPermission(java.security.Permission) checkPermission
+     * @see        #checkPermission(Permission) checkPermission
      */
     public void checkPackageAccess(String pkg) {
-        if (pkg == null) {
-            throw new NullPointerException("package name can't be null");
+        Objects.requireNonNull(pkg, "package name can't be null");
+
+        // check if pkg is not exported to all modules
+        if (nonExportedPkgs.containsKey(pkg)) {
+            checkPermission(
+                new RuntimePermission("accessClassInPackage." + pkg));
+            return;
         }
 
-        String[] pkgs;
+        String[] restrictedPkgs;
         synchronized (packageAccessLock) {
             /*
              * Do we need to update our property array?
@@ -1540,10 +1248,9 @@ class SecurityManager {
             if (!packageAccessValid) {
                 String tmpPropertyStr =
                     AccessController.doPrivileged(
-                        new PrivilegedAction<String>() {
+                        new PrivilegedAction<>() {
                             public String run() {
-                                return java.security.Security.getProperty(
-                                    "package.access");
+                                return Security.getProperty("package.access");
                             }
                         }
                     );
@@ -1553,52 +1260,83 @@ class SecurityManager {
 
             // Using a snapshot of packageAccess -- don't care if static field
             // changes afterwards; array contents won't change.
-            pkgs = packageAccess;
+            restrictedPkgs = packageAccess;
         }
 
         /*
          * Traverse the list of packages, check for any matches.
          */
-        for (int i = 0; i < pkgs.length; i++) {
-            if (pkg.startsWith(pkgs[i]) || pkgs[i].equals(pkg + ".")) {
+        final int plen = pkg.length();
+        for (String restrictedPkg : restrictedPkgs) {
+            final int rlast = restrictedPkg.length() - 1;
+
+            // Optimizations:
+            //
+            // If rlast >= plen then restrictedPkg is longer than pkg by at
+            // least one char. This means pkg cannot start with restrictedPkg,
+            // since restrictedPkg will be longer than pkg.
+            //
+            // Similarly if rlast != plen, then pkg + "." cannot be the same
+            // as restrictedPkg, since pkg + "." will have a different length
+            // than restrictedPkg.
+            //
+            if (rlast < plen && pkg.startsWith(restrictedPkg) ||
+                // The following test is equivalent to
+                // restrictedPkg.equals(pkg + ".") but is noticeably more
+                // efficient:
+                rlast == plen && restrictedPkg.startsWith(pkg) &&
+                restrictedPkg.charAt(rlast) == '.')
+            {
                 checkPermission(
-                    new RuntimePermission("accessClassInPackage."+pkg));
+                    new RuntimePermission("accessClassInPackage." + pkg));
                 break;  // No need to continue; only need to check this once
             }
         }
     }
 
     /**
-     * Throws a <code>SecurityException</code> if the
-     * calling thread is not allowed to define classes in the package
-     * specified by the argument.
+     * Throws a {@code SecurityException} if the calling thread is not
+     * allowed to define classes in the specified package.
      * <p>
-     * This method is used by the <code>loadClass</code> method of some
+     * This method is called by the {@code loadClass} method of some
      * class loaders.
      * <p>
-     * This method first gets a list of restricted packages by
-     * obtaining a comma-separated list from a call to
-     * <code>java.security.Security.getProperty("package.definition")</code>,
-     * and checks to see if <code>pkg</code> starts with or equals
-     * any of the restricted packages. If it does, then
-     * <code>checkPermission</code> gets called with the
-     * <code>RuntimePermission("defineClassInPackage."+pkg)</code>
-     * permission.
+     * This method checks if the specified package starts with or equals
+     * any of the packages in the {@code package.definition} Security
+     * Property. An implementation may also check the package against an
+     * additional list of restricted packages as noted below. If the package
+     * is restricted, {@link #checkPermission(Permission)} is called with a
+     * {@code RuntimePermission("defineClassInPackage."+pkg)} permission.
      * <p>
-     * If this method is overridden, then
-     * <code>super.checkPackageDefinition</code> should be called
-     * as the first line in the overridden method.
+     * If this method is overridden, then {@code super.checkPackageDefinition}
+     * should be called as the first line in the overridden method.
+     *
+     * @implNote
+     * This implementation also restricts all non-exported packages of modules
+     * loaded by {@linkplain ClassLoader#getPlatformClassLoader
+     * the platform class loader} or its ancestors. A "non-exported package"
+     * refers to a package that is not exported to all modules. Specifically,
+     * it refers to a package that either is not exported at all by its
+     * containing module or is exported in a qualified fashion by its
+     * containing module.
      *
      * @param      pkg   the package name.
-     * @exception  SecurityException  if the calling thread does not have
+     * @throws     SecurityException  if the calling thread does not have
      *             permission to define classes in the specified package.
-     * @see        java.lang.ClassLoader#loadClass(java.lang.String, boolean)
+     * @throws     NullPointerException if the package name argument is
+     *             {@code null}.
+     * @see        java.lang.ClassLoader#loadClass(String, boolean)
      * @see        java.security.Security#getProperty getProperty
-     * @see        #checkPermission(java.security.Permission) checkPermission
+     * @see        #checkPermission(Permission) checkPermission
      */
     public void checkPackageDefinition(String pkg) {
-        if (pkg == null) {
-            throw new NullPointerException("package name can't be null");
+        Objects.requireNonNull(pkg, "package name can't be null");
+
+        // check if pkg is not exported to all modules
+        if (nonExportedPkgs.containsKey(pkg)) {
+            checkPermission(
+                new RuntimePermission("defineClassInPackage." + pkg));
+            return;
         }
 
         String[] pkgs;
@@ -1609,7 +1347,7 @@ class SecurityManager {
             if (!packageDefinitionValid) {
                 String tmpPropertyStr =
                     AccessController.doPrivileged(
-                        new PrivilegedAction<String>() {
+                        new PrivilegedAction<>() {
                             public String run() {
                                 return java.security.Security.getProperty(
                                     "package.definition");
@@ -1627,10 +1365,10 @@ class SecurityManager {
         /*
          * Traverse the list of packages, check for any matches.
          */
-        for (int i = 0; i < pkgs.length; i++) {
-            if (pkg.startsWith(pkgs[i]) || pkgs[i].equals(pkg + ".")) {
+        for (String restrictedPkg : pkgs) {
+            if (pkg.startsWith(restrictedPkg) || restrictedPkg.equals(pkg + ".")) {
                 checkPermission(
-                    new RuntimePermission("defineClassInPackage."+pkg));
+                    new RuntimePermission("defineClassInPackage." + pkg));
                 break; // No need to continue; only need to check this once
             }
         }
@@ -1649,7 +1387,6 @@ class SecurityManager {
      * <code>super.checkSetFactory</code>
      * at the point the overridden method would normally throw an
      * exception.
-     * <p>
      *
      * @exception  SecurityException  if the calling thread does not have
      *             permission to specify a socket factory or a stream
@@ -1662,67 +1399,6 @@ class SecurityManager {
      */
     public void checkSetFactory() {
         checkPermission(new RuntimePermission("setFactory"));
-    }
-
-    /**
-     * Throws a <code>SecurityException</code> if the
-     * calling thread is not allowed to access members.
-     * <p>
-     * The default policy is to allow access to PUBLIC members, as well
-     * as access to classes that have the same class loader as the caller.
-     * In all other cases, this method calls <code>checkPermission</code>
-     * with the <code>RuntimePermission("accessDeclaredMembers")
-     * </code> permission.
-     * <p>
-     * If this method is overridden, then a call to
-     * <code>super.checkMemberAccess</code> cannot be made,
-     * as the default implementation of <code>checkMemberAccess</code>
-     * relies on the code being checked being at a stack depth of
-     * 4.
-     *
-     * @param clazz the class that reflection is to be performed on.
-     *
-     * @param which type of access, PUBLIC or DECLARED.
-     *
-     * @exception  SecurityException if the caller does not have
-     *             permission to access members.
-     * @exception  NullPointerException if the <code>clazz</code> argument is
-     *             <code>null</code>.
-     *
-     * @deprecated This method relies on the caller being at a stack depth
-     *             of 4 which is error-prone and cannot be enforced by the runtime.
-     *             Users of this method should instead invoke {@link #checkPermission}
-     *             directly.  This method will be changed in a future release
-     *             to check the permission {@code java.security.AllPermission}.
-     *
-     * @see java.lang.reflect.Member
-     * @since JDK1.1
-     * @see        #checkPermission(java.security.Permission) checkPermission
-     */
-    @Deprecated
-    @CallerSensitive
-    public void checkMemberAccess(Class<?> clazz, int which) {
-        if (clazz == null) {
-            throw new NullPointerException("class can't be null");
-        }
-        if (which != Member.PUBLIC) {
-            Class<?> stack[] = getClassContext();
-            /*
-             * stack depth of 4 should be the caller of one of the
-             * methods in java.lang.Class that invoke checkMember
-             * access. The stack should look like:
-             *
-             * someCaller                        [3]
-             * java.lang.Class.someReflectionAPI [2]
-             * java.lang.Class.checkMemberAccess [1]
-             * SecurityManager.checkMemberAccess [0]
-             *
-             */
-            if ((stack.length<4) ||
-                (stack[3].getClassLoader() != clazz.getClassLoader())) {
-                checkPermission(SecurityConstants.CHECK_MEMBER_ACCESS_PERMISSION);
-            }
-        }
     }
 
     /**
@@ -1752,14 +1428,12 @@ class SecurityManager {
      * @exception NullPointerException if <code>target</code> is null.
      * @exception IllegalArgumentException if <code>target</code> is empty.
      *
-     * @since   JDK1.1
+     * @since   1.1
      * @see        #checkPermission(java.security.Permission) checkPermission
      */
     public void checkSecurityAccess(String target) {
         checkPermission(new SecurityPermission(target));
     }
-
-    private native Class<?> currentLoadedClass0();
 
     /**
      * Returns the thread group into which to instantiate any new
@@ -1769,7 +1443,7 @@ class SecurityManager {
      * manager to return the appropriate thread group.
      *
      * @return  ThreadGroup that new threads are instantiated into
-     * @since   JDK1.1
+     * @since   1.1
      * @see     java.lang.ThreadGroup
      */
     public ThreadGroup getThreadGroup() {

@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -34,9 +34,13 @@
  */
 
 package java.util.concurrent.atomic;
-import java.util.function.LongBinaryOperator;
-import java.util.function.DoubleBinaryOperator;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.DoubleBinaryOperator;
+import java.util.function.LongBinaryOperator;
 
 /**
  * A package-local class holding common representation and mechanics
@@ -53,13 +57,13 @@ abstract class Striped64 extends Number {
      * accessed directly by subclasses.
      *
      * Table entries are of class Cell; a variant of AtomicLong padded
-     * (via @sun.misc.Contended) to reduce cache contention. Padding
-     * is overkill for most Atomics because they are usually
-     * irregularly scattered in memory and thus don't interfere much
-     * with each other. But Atomic objects residing in arrays will
-     * tend to be placed adjacent to each other, and so will most
-     * often share cache lines (with a huge negative performance
-     * impact) without this precaution.
+     * (via @Contended) to reduce cache contention. Padding is
+     * overkill for most Atomics because they are usually irregularly
+     * scattered in memory and thus don't interfere much with each
+     * other. But Atomic objects residing in arrays will tend to be
+     * placed adjacent to each other, and so will most often share
+     * cache lines (with a huge negative performance impact) without
+     * this precaution.
      *
      * In part because Cells are relatively large, we avoid creating
      * them until they are needed.  When there is no contention, all
@@ -117,24 +121,30 @@ abstract class Striped64 extends Number {
      * JVM intrinsics note: It would be possible to use a release-only
      * form of CAS here, if it were provided.
      */
-    @sun.misc.Contended static final class Cell {
+    @jdk.internal.vm.annotation.Contended static final class Cell {
         volatile long value;
         Cell(long x) { value = x; }
         final boolean cas(long cmp, long val) {
-            return UNSAFE.compareAndSwapLong(this, valueOffset, cmp, val);
+            return VALUE.compareAndSet(this, cmp, val);
+        }
+        final void reset() {
+            VALUE.setVolatile(this, 0L);
+        }
+        final void reset(long identity) {
+            VALUE.setVolatile(this, identity);
+        }
+        final long getAndSet(long val) {
+            return (long)VALUE.getAndSet(this, val);
         }
 
-        // Unsafe mechanics
-        private static final sun.misc.Unsafe UNSAFE;
-        private static final long valueOffset;
+        // VarHandle mechanics
+        private static final VarHandle VALUE;
         static {
             try {
-                UNSAFE = sun.misc.Unsafe.getUnsafe();
-                Class<?> ak = Cell.class;
-                valueOffset = UNSAFE.objectFieldOffset
-                    (ak.getDeclaredField("value"));
-            } catch (Exception e) {
-                throw new Error(e);
+                MethodHandles.Lookup l = MethodHandles.lookup();
+                VALUE = l.findVarHandle(Cell.class, "value", long.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
             }
         }
     }
@@ -159,7 +169,7 @@ abstract class Striped64 extends Number {
     transient volatile int cellsBusy;
 
     /**
-     * Package-private default constructor
+     * Package-private default constructor.
      */
     Striped64() {
     }
@@ -168,14 +178,18 @@ abstract class Striped64 extends Number {
      * CASes the base field.
      */
     final boolean casBase(long cmp, long val) {
-        return UNSAFE.compareAndSwapLong(this, BASE, cmp, val);
+        return BASE.compareAndSet(this, cmp, val);
+    }
+
+    final long getAndSetBase(long val) {
+        return (long)BASE.getAndSet(this, val);
     }
 
     /**
      * CASes the cellsBusy field from 0 to 1 to acquire lock.
      */
     final boolean casCellsBusy() {
-        return UNSAFE.compareAndSwapInt(this, CELLSBUSY, 0, 1);
+        return CELLSBUSY.compareAndSet(this, 0, 1);
     }
 
     /**
@@ -183,7 +197,7 @@ abstract class Striped64 extends Number {
      * Duplicated from ThreadLocalRandom because of packaging restrictions.
      */
     static final int getProbe() {
-        return UNSAFE.getInt(Thread.currentThread(), PROBE);
+        return (int) THREAD_PROBE.get(Thread.currentThread());
     }
 
     /**
@@ -195,7 +209,7 @@ abstract class Striped64 extends Number {
         probe ^= probe << 13;   // xorshift
         probe ^= probe >>> 17;
         probe ^= probe << 5;
-        UNSAFE.putInt(Thread.currentThread(), PROBE, probe);
+        THREAD_PROBE.set(Thread.currentThread(), probe);
         return probe;
     }
 
@@ -220,27 +234,24 @@ abstract class Striped64 extends Number {
             wasUncontended = true;
         }
         boolean collide = false;                // True if last slot nonempty
-        for (;;) {
-            Cell[] as; Cell a; int n; long v;
-            if ((as = cells) != null && (n = as.length) > 0) {
-                if ((a = as[(n - 1) & h]) == null) {
+        done: for (;;) {
+            Cell[] cs; Cell c; int n; long v;
+            if ((cs = cells) != null && (n = cs.length) > 0) {
+                if ((c = cs[(n - 1) & h]) == null) {
                     if (cellsBusy == 0) {       // Try to attach new Cell
                         Cell r = new Cell(x);   // Optimistically create
                         if (cellsBusy == 0 && casCellsBusy()) {
-                            boolean created = false;
                             try {               // Recheck under lock
                                 Cell[] rs; int m, j;
                                 if ((rs = cells) != null &&
                                     (m = rs.length) > 0 &&
                                     rs[j = (m - 1) & h] == null) {
                                     rs[j] = r;
-                                    created = true;
+                                    break done;
                                 }
                             } finally {
                                 cellsBusy = 0;
                             }
-                            if (created)
-                                break;
                             continue;           // Slot is now non-empty
                         }
                     }
@@ -248,21 +259,17 @@ abstract class Striped64 extends Number {
                 }
                 else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
-                else if (a.cas(v = a.value, ((fn == null) ? v + x :
-                                             fn.applyAsLong(v, x))))
+                else if (c.cas(v = c.value,
+                               (fn == null) ? v + x : fn.applyAsLong(v, x)))
                     break;
-                else if (n >= NCPU || cells != as)
+                else if (n >= NCPU || cells != cs)
                     collide = false;            // At max size or stale
                 else if (!collide)
                     collide = true;
                 else if (cellsBusy == 0 && casCellsBusy()) {
                     try {
-                        if (cells == as) {      // Expand table unless stale
-                            Cell[] rs = new Cell[n << 1];
-                            for (int i = 0; i < n; ++i)
-                                rs[i] = as[i];
-                            cells = rs;
-                        }
+                        if (cells == cs)        // Expand table unless stale
+                            cells = Arrays.copyOf(cs, n << 1);
                     } finally {
                         cellsBusy = 0;
                     }
@@ -271,25 +278,29 @@ abstract class Striped64 extends Number {
                 }
                 h = advanceProbe(h);
             }
-            else if (cellsBusy == 0 && cells == as && casCellsBusy()) {
-                boolean init = false;
+            else if (cellsBusy == 0 && cells == cs && casCellsBusy()) {
                 try {                           // Initialize table
-                    if (cells == as) {
+                    if (cells == cs) {
                         Cell[] rs = new Cell[2];
                         rs[h & 1] = new Cell(x);
                         cells = rs;
-                        init = true;
+                        break done;
                     }
                 } finally {
                     cellsBusy = 0;
                 }
-                if (init)
-                    break;
             }
-            else if (casBase(v = base, ((fn == null) ? v + x :
-                                        fn.applyAsLong(v, x))))
-                break;                          // Fall back on using base
+            // Fall back on using base
+            else if (casBase(v = base,
+                             (fn == null) ? v + x : fn.applyAsLong(v, x)))
+                break done;
         }
+    }
+
+    private static long apply(DoubleBinaryOperator fn, long v, double x) {
+        double d = Double.longBitsToDouble(v);
+        d = (fn == null) ? d + x : fn.applyAsDouble(d, x);
+        return Double.doubleToRawLongBits(d);
     }
 
     /**
@@ -307,27 +318,24 @@ abstract class Striped64 extends Number {
             wasUncontended = true;
         }
         boolean collide = false;                // True if last slot nonempty
-        for (;;) {
-            Cell[] as; Cell a; int n; long v;
-            if ((as = cells) != null && (n = as.length) > 0) {
-                if ((a = as[(n - 1) & h]) == null) {
+        done: for (;;) {
+            Cell[] cs; Cell c; int n; long v;
+            if ((cs = cells) != null && (n = cs.length) > 0) {
+                if ((c = cs[(n - 1) & h]) == null) {
                     if (cellsBusy == 0) {       // Try to attach new Cell
                         Cell r = new Cell(Double.doubleToRawLongBits(x));
                         if (cellsBusy == 0 && casCellsBusy()) {
-                            boolean created = false;
                             try {               // Recheck under lock
                                 Cell[] rs; int m, j;
                                 if ((rs = cells) != null &&
                                     (m = rs.length) > 0 &&
                                     rs[j = (m - 1) & h] == null) {
                                     rs[j] = r;
-                                    created = true;
+                                    break done;
                                 }
                             } finally {
                                 cellsBusy = 0;
                             }
-                            if (created)
-                                break;
                             continue;           // Slot is now non-empty
                         }
                     }
@@ -335,26 +343,16 @@ abstract class Striped64 extends Number {
                 }
                 else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
-                else if (a.cas(v = a.value,
-                               ((fn == null) ?
-                                Double.doubleToRawLongBits
-                                (Double.longBitsToDouble(v) + x) :
-                                Double.doubleToRawLongBits
-                                (fn.applyAsDouble
-                                 (Double.longBitsToDouble(v), x)))))
+                else if (c.cas(v = c.value, apply(fn, v, x)))
                     break;
-                else if (n >= NCPU || cells != as)
+                else if (n >= NCPU || cells != cs)
                     collide = false;            // At max size or stale
                 else if (!collide)
                     collide = true;
                 else if (cellsBusy == 0 && casCellsBusy()) {
                     try {
-                        if (cells == as) {      // Expand table unless stale
-                            Cell[] rs = new Cell[n << 1];
-                            for (int i = 0; i < n; ++i)
-                                rs[i] = as[i];
-                            cells = rs;
-                        }
+                        if (cells == cs)        // Expand table unless stale
+                            cells = Arrays.copyOf(cs, n << 1);
                     } finally {
                         cellsBusy = 0;
                     }
@@ -363,50 +361,48 @@ abstract class Striped64 extends Number {
                 }
                 h = advanceProbe(h);
             }
-            else if (cellsBusy == 0 && cells == as && casCellsBusy()) {
-                boolean init = false;
+            else if (cellsBusy == 0 && cells == cs && casCellsBusy()) {
                 try {                           // Initialize table
-                    if (cells == as) {
+                    if (cells == cs) {
                         Cell[] rs = new Cell[2];
                         rs[h & 1] = new Cell(Double.doubleToRawLongBits(x));
                         cells = rs;
-                        init = true;
+                        break done;
                     }
                 } finally {
                     cellsBusy = 0;
                 }
-                if (init)
-                    break;
             }
-            else if (casBase(v = base,
-                             ((fn == null) ?
-                              Double.doubleToRawLongBits
-                              (Double.longBitsToDouble(v) + x) :
-                              Double.doubleToRawLongBits
-                              (fn.applyAsDouble
-                               (Double.longBitsToDouble(v), x)))))
-                break;                          // Fall back on using base
+            // Fall back on using base
+            else if (casBase(v = base, apply(fn, v, x)))
+                break done;
         }
     }
 
-    // Unsafe mechanics
-    private static final sun.misc.Unsafe UNSAFE;
-    private static final long BASE;
-    private static final long CELLSBUSY;
-    private static final long PROBE;
+    // VarHandle mechanics
+    private static final VarHandle BASE;
+    private static final VarHandle CELLSBUSY;
+    private static final VarHandle THREAD_PROBE;
     static {
         try {
-            UNSAFE = sun.misc.Unsafe.getUnsafe();
-            Class<?> sk = Striped64.class;
-            BASE = UNSAFE.objectFieldOffset
-                (sk.getDeclaredField("base"));
-            CELLSBUSY = UNSAFE.objectFieldOffset
-                (sk.getDeclaredField("cellsBusy"));
-            Class<?> tk = Thread.class;
-            PROBE = UNSAFE.objectFieldOffset
-                (tk.getDeclaredField("threadLocalRandomProbe"));
-        } catch (Exception e) {
-            throw new Error(e);
+            MethodHandles.Lookup l = MethodHandles.lookup();
+            BASE = l.findVarHandle(Striped64.class,
+                    "base", long.class);
+            CELLSBUSY = l.findVarHandle(Striped64.class,
+                    "cellsBusy", int.class);
+            l = java.security.AccessController.doPrivileged(
+                    new java.security.PrivilegedAction<>() {
+                        public MethodHandles.Lookup run() {
+                            try {
+                                return MethodHandles.privateLookupIn(Thread.class, MethodHandles.lookup());
+                            } catch (ReflectiveOperationException e) {
+                                throw new ExceptionInInitializerError(e);
+                            }
+                        }});
+            THREAD_PROBE = l.findVarHandle(Thread.class,
+                    "threadLocalRandomProbe", int.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
         }
     }
 

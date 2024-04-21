@@ -1,30 +1,31 @@
 /*
- * Copyright (c) 1994, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1994, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+
+import jdk.internal.misc.Unsafe;
 
 /**
  * A <code>BufferedInputStream</code> adds
@@ -45,7 +46,7 @@ import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
  * the contained input stream.
  *
  * @author  Arthur van Hoff
- * @since   JDK1.0
+ * @since   1.0
  */
 public
 class BufferedInputStream extends FilterInputStream {
@@ -61,22 +62,27 @@ class BufferedInputStream extends FilterInputStream {
     private static int MAX_BUFFER_SIZE = Integer.MAX_VALUE - 8;
 
     /**
+     * As this class is used early during bootstrap, it's motivated to use
+     * Unsafe.compareAndSetObject instead of AtomicReferenceFieldUpdater
+     * (or VarHandles) to reduce dependencies and improve startup time.
+     */
+    private static final Unsafe U = Unsafe.getUnsafe();
+
+    private static final long BUF_OFFSET
+            = U.objectFieldOffset(BufferedInputStream.class, "buf");
+
+    /**
      * The internal buffer array where the data is stored. When necessary,
      * it may be replaced by another array of
      * a different size.
      */
-    protected volatile byte buf[];
-
-    /**
-     * Atomic updater to provide compareAndSet for buf. This is
-     * necessary because closes can be asynchronous. We use nullness
-     * of buf[] as primary indicator that this stream is closed. (The
-     * "in" field is also nulled out on close.)
+    /*
+     * We null this out with a CAS on close(), which is necessary since
+     * closes can be asynchronous. We use nullness of buf[] as primary
+     * indicator that this stream is closed. (The "in" field is also
+     * nulled out on close.)
      */
-    private static final
-        AtomicReferenceFieldUpdater<BufferedInputStream, byte[]> bufUpdater =
-        AtomicReferenceFieldUpdater.newUpdater
-        (BufferedInputStream.class,  byte[].class, "buf");
+    protected volatile byte[] buf;
 
     /**
      * The index one greater than the index of the last valid byte in
@@ -230,9 +236,9 @@ class BufferedInputStream extends FilterInputStream {
                         pos * 2 : MAX_BUFFER_SIZE;
                 if (nsz > marklimit)
                     nsz = marklimit;
-                byte nbuf[] = new byte[nsz];
+                byte[] nbuf = new byte[nsz];
                 System.arraycopy(buffer, 0, nbuf, 0, pos);
-                if (!bufUpdater.compareAndSet(this, buffer, nbuf)) {
+                if (!U.compareAndSetObject(this, BUF_OFFSET, buffer, nbuf)) {
                     // Can't replace buf if there was an async close.
                     // Note: This would need to be changed if fill()
                     // is ever made accessible to multiple threads.
@@ -359,10 +365,10 @@ class BufferedInputStream extends FilterInputStream {
      * See the general contract of the <code>skip</code>
      * method of <code>InputStream</code>.
      *
-     * @exception  IOException  if the stream does not support seek,
-     *                          or if this input stream has been closed by
-     *                          invoking its {@link #close()} method, or an
-     *                          I/O error occurs.
+     * @throws IOException  if this input stream has been closed by
+     *                      invoking its {@link #close()} method,
+     *                      {@code in.skip(n)} throws an IOException,
+     *                      or an I/O error occurs.
      */
     public synchronized long skip(long n) throws IOException {
         getBufIfOpen(); // Check for closed stream
@@ -476,7 +482,7 @@ class BufferedInputStream extends FilterInputStream {
     public void close() throws IOException {
         byte[] buffer;
         while ( (buffer = buf) != null) {
-            if (bufUpdater.compareAndSet(this, buffer, null)) {
+            if (U.compareAndSetObject(this, BUF_OFFSET, buffer, null)) {
                 InputStream input = in;
                 in = null;
                 if (input != null)

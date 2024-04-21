@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1998, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1998, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package javax.security.auth.login;
@@ -178,10 +178,11 @@ import sun.security.jca.GetInstance;
  * constructed by invoking one of the {@code getInstance} factory methods
  * with a standard type.  The default policy type is "JavaLoginConfig".
  * See the Configuration section in the <a href=
- * "{@docRoot}/../technotes/guides/security/StandardNames.html#Configuration">
- * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+ * "{@docRoot}/../specs/security/standard-names.html#configuration-types">
+ * Java Security Standard Algorithm Names Specification</a>
  * for a list of standard Configuration types.
  *
+ * @since 1.4
  * @see javax.security.auth.login.LoginContext
  * @see java.security.Security security properties
  */
@@ -209,8 +210,6 @@ public abstract class Configuration {
     /**
      * Get the installed login Configuration.
      *
-     * <p>
-     *
      * @return the login Configuration.  If a Configuration object was set
      *          via the {@code Configuration.setConfiguration} method,
      *          then that object is returned.  Otherwise, a default
@@ -231,7 +230,7 @@ public abstract class Configuration {
             if (configuration == null) {
                 String config_class = null;
                 config_class = AccessController.doPrivileged
-                    (new PrivilegedAction<String>() {
+                    (new PrivilegedAction<>() {
                     public String run() {
                         return java.security.Security.getProperty
                                     ("login.configuration.provider");
@@ -244,7 +243,7 @@ public abstract class Configuration {
                 try {
                     final String finalClass = config_class;
                     Configuration untrustedImpl = AccessController.doPrivileged(
-                            new PrivilegedExceptionAction<Configuration>() {
+                            new PrivilegedExceptionAction<>() {
                                 public Configuration run() throws ClassNotFoundException,
                                         InstantiationException,
                                         IllegalAccessException {
@@ -252,11 +251,13 @@ public abstract class Configuration {
                                             finalClass, false,
                                             Thread.currentThread().getContextClassLoader()
                                     ).asSubclass(Configuration.class);
-                                    return implClass.newInstance();
+                                    @SuppressWarnings("deprecation")
+                                    Configuration result = implClass.newInstance();
+                                    return result;
                                 }
                             });
                     AccessController.doPrivileged(
-                            new PrivilegedExceptionAction<Void>() {
+                            new PrivilegedExceptionAction<>() {
                                 public Void run() {
                                     setConfiguration(untrustedImpl);
                                     return null;
@@ -287,8 +288,6 @@ public abstract class Configuration {
     /**
      * Set the login {@code Configuration}.
      *
-     * <p>
-     *
      * @param configuration the new {@code Configuration}
      *
      * @exception SecurityException if the current thread does not have
@@ -315,35 +314,45 @@ public abstract class Configuration {
      * <p> Note that the list of registered providers may be retrieved via
      * the {@link Security#getProviders() Security.getProviders()} method.
      *
+     * @implNote
+     * The JDK Reference Implementation additionally uses the
+     * {@code jdk.security.provider.preferred}
+     * {@link Security#getProperty(String) Security} property to determine
+     * the preferred provider order for the specified algorithm. This
+     * may be different than the order of providers returned by
+     * {@link Security#getProviders() Security.getProviders()}.
+     *
      * @param type the specified Configuration type.  See the Configuration
      *    section in the <a href=
-     *    "{@docRoot}/../technotes/guides/security/StandardNames.html#Configuration">
-     *    Java Cryptography Architecture Standard Algorithm Name
-     *    Documentation</a> for a list of standard Configuration types.
+     *    "{@docRoot}/../specs/security/standard-names.html#configuration-types">
+     *    Java Security Standard Algorithm Names Specification</a>
+     *    for a list of standard Configuration types.
      *
      * @param params parameters for the Configuration, which may be null.
      *
-     * @return the new Configuration object.
+     * @return the new {@code Configuration} object
      *
-     * @exception SecurityException if the caller does not have permission
-     *          to get a Configuration instance for the specified type.
+     * @throws IllegalArgumentException if the specified parameters
+     *         are not understood by the {@code ConfigurationSpi}
+     *         implementation from the selected {@code Provider}
      *
-     * @exception NullPointerException if the specified type is null.
+     * @throws NoSuchAlgorithmException if no {@code Provider} supports a
+     *         {@code ConfigurationSpi} implementation for the specified type
      *
-     * @exception IllegalArgumentException if the specified parameters
-     *          are not understood by the ConfigurationSpi implementation
-     *          from the selected Provider.
+     * @throws NullPointerException if {@code type} is {@code null}
      *
-     * @exception NoSuchAlgorithmException if no Provider supports a
-     *          ConfigurationSpi implementation for the specified type.
+     * @throws SecurityException if the caller does not have permission
+     *         to get a {@code Configuration} instance for the specified type
      *
      * @see Provider
+     *
      * @since 1.6
      */
     public static Configuration getInstance(String type,
                                 Configuration.Parameters params)
                 throws NoSuchAlgorithmException {
 
+        Objects.requireNonNull(type, "null type name");
         checkPermission(type);
         try {
             GetInstance.Instance instance = GetInstance.getInstance
@@ -373,32 +382,32 @@ public abstract class Configuration {
      *
      * @param type the specified Configuration type.  See the Configuration
      *    section in the <a href=
-     *    "{@docRoot}/../technotes/guides/security/StandardNames.html#Configuration">
-     *    Java Cryptography Architecture Standard Algorithm Name
-     *    Documentation</a> for a list of standard Configuration types.
+     *    "{@docRoot}/../specs/security/standard-names.html#configuration-types">
+     *    Java Security Standard Algorithm Names Specification</a>
+     *    for a list of standard Configuration types.
      *
      * @param params parameters for the Configuration, which may be null.
      *
      * @param provider the provider.
      *
-     * @return the new Configuration object.
+     * @return the new {@code Configuration} object
      *
-     * @exception SecurityException if the caller does not have permission
-     *          to get a Configuration instance for the specified type.
+     * @throws IllegalArgumentException if the specified provider
+     *         is {@code null} or empty, or if the specified parameters
+     *         are not understood by the {@code ConfigurationSpi}
+     *         implementation from the specified provider
      *
-     * @exception NullPointerException if the specified type is null.
+     * @throws NoSuchProviderException if the specified provider is not
+     *         registered in the security provider list
      *
-     * @exception IllegalArgumentException if the specified provider
-     *          is null or empty,
-     *          or if the specified parameters are not understood by
-     *          the ConfigurationSpi implementation from the specified provider.
+     * @throws NoSuchAlgorithmException if the specified provider does not
+     *         support a {@code ConfigurationSpi} implementation for the
+     *         specified type
      *
-     * @exception NoSuchProviderException if the specified provider is not
-     *          registered in the security provider list.
+     * @throws NullPointerException if {@code type} is {@code null}
      *
-     * @exception NoSuchAlgorithmException if the specified provider does not
-     *          support a ConfigurationSpi implementation for the specified
-     *          type.
+     * @throws SecurityException if the caller does not have permission
+     *         to get a {@code Configuration} instance for the specified type
      *
      * @see Provider
      * @since 1.6
@@ -408,7 +417,8 @@ public abstract class Configuration {
                                 String provider)
                 throws NoSuchProviderException, NoSuchAlgorithmException {
 
-        if (provider == null || provider.length() == 0) {
+        Objects.requireNonNull(type, "null type name");
+        if (provider == null || provider.isEmpty()) {
             throw new IllegalArgumentException("missing provider");
         }
 
@@ -439,28 +449,29 @@ public abstract class Configuration {
      *
      * @param type the specified Configuration type.  See the Configuration
      *    section in the <a href=
-     *    "{@docRoot}/../technotes/guides/security/StandardNames.html#Configuration">
-     *    Java Cryptography Architecture Standard Algorithm Name
-     *    Documentation</a> for a list of standard Configuration types.
+     *    "{@docRoot}/../specs/security/standard-names.html#configuration-types">
+     *    Java Security Standard Algorithm Names Specification</a>
+     *    for a list of standard Configuration types.
      *
      * @param params parameters for the Configuration, which may be null.
      *
      * @param provider the Provider.
      *
-     * @return the new Configuration object.
+     * @return the new {@code Configuration} object
      *
-     * @exception SecurityException if the caller does not have permission
-     *          to get a Configuration instance for the specified type.
+     * @throws IllegalArgumentException if the specified {@code Provider}
+     *         is {@code null}, or if the specified parameters are not
+     *         understood by the {@code ConfigurationSpi} implementation
+     *         from the specified Provider
      *
-     * @exception NullPointerException if the specified type is null.
+     * @throws NoSuchAlgorithmException if the specified {@code Provider}
+     *         does not support a {@code ConfigurationSpi} implementation
+     *         for the specified type
      *
-     * @exception IllegalArgumentException if the specified Provider is null,
-     *          or if the specified parameters are not understood by
-     *          the ConfigurationSpi implementation from the specified Provider.
+     * @throws NullPointerException if {@code type} is {@code null}
      *
-     * @exception NoSuchAlgorithmException if the specified Provider does not
-     *          support a ConfigurationSpi implementation for the specified
-     *          type.
+     * @throws SecurityException if the caller does not have permission
+     *         to get a {@code Configuration} instance for the specified type
      *
      * @see Provider
      * @since 1.6
@@ -470,6 +481,7 @@ public abstract class Configuration {
                                 Provider provider)
                 throws NoSuchAlgorithmException {
 
+        Objects.requireNonNull(type, "null type name");
         if (provider == null) {
             throw new IllegalArgumentException("missing provider");
         }
@@ -546,16 +558,14 @@ public abstract class Configuration {
     }
 
     /**
-     * Retrieve the AppConfigurationEntries for the specified <i>name</i>
+     * Retrieve the AppConfigurationEntries for the specified {@code name}
      * from this Configuration.
-     *
-     * <p>
      *
      * @param name the name used to index the Configuration.
      *
-     * @return an array of AppConfigurationEntries for the specified <i>name</i>
+     * @return an array of AppConfigurationEntries for the specified {@code name}
      *          from this Configuration, or null if there are no entries
-     *          for the specified <i>name</i>
+     *          for the specified {@code name}
      */
     public abstract AppConfigurationEntry[] getAppConfigurationEntry
                                                         (String name);

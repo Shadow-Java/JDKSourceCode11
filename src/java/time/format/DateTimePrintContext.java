@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2011-2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -146,7 +146,7 @@ final class DateTimePrintContext {
         if (overrideZone != null) {
             // if have zone and instant, calculation is simple, defaulting chrono if necessary
             if (temporal.isSupported(INSTANT_SECONDS)) {
-                Chronology chrono = (effectiveChrono != null ? effectiveChrono : IsoChronology.INSTANCE);
+                Chronology chrono = Objects.requireNonNullElse(effectiveChrono, IsoChronology.INSTANCE);
                 return chrono.zonedDateTime(Instant.from(temporal), overrideZone);
             }
             // block changing zone on OffsetTime, and similar problem cases
@@ -218,6 +218,13 @@ final class DateTimePrintContext {
                 }
                 return query.queryFrom(this);
             }
+
+            @Override
+            public String toString() {
+                return temporal +
+                        (effectiveChrono != null ? " with chronology " + effectiveChrono : "") +
+                        (effectiveZone != null ? " with zone " + effectiveZone : "");
+            }
         };
     }
 
@@ -279,7 +286,8 @@ final class DateTimePrintContext {
     <R> R getValue(TemporalQuery<R> query) {
         R result = temporal.query(query);
         if (result == null && optional == 0) {
-            throw new DateTimeException("Unable to extract value: " + temporal.getClass());
+            throw new DateTimeException("Unable to extract " +
+                    query + " from temporal " + temporal);
         }
         return result;
     }
@@ -294,14 +302,10 @@ final class DateTimePrintContext {
      * @throws DateTimeException if the field is not available and the section is not optional
      */
     Long getValue(TemporalField field) {
-        try {
-            return temporal.getLong(field);
-        } catch (DateTimeException ex) {
-            if (optional > 0) {
-                return null;
-            }
-            throw ex;
+        if (optional > 0 && !temporal.isSupported(field)) {
+            return null;
         }
+        return temporal.getLong(field);
     }
 
     //-----------------------------------------------------------------------

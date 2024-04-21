@@ -1,32 +1,31 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 // -- This file was mechanically generated: Do not edit! -- //
 
 package java.nio;
-
 
 /**
 
@@ -42,6 +41,11 @@ package java.nio;
 class HeapCharBuffer
     extends CharBuffer
 {
+    // Cached array base offset
+    private static final long ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(char[].class);
+
+    // Cached array base offset
+    private static final long ARRAY_INDEX_SCALE = UNSAFE.arrayIndexScale(char[].class);
 
     // For speed these fields are actually declared in X-Buffer;
     // these declarations are here as documentation
@@ -59,6 +63,7 @@ class HeapCharBuffer
         hb = new char[cap];
         offset = 0;
         */
+        this.address = ARRAY_BASE_OFFSET;
 
 
 
@@ -72,6 +77,7 @@ class HeapCharBuffer
         hb = buf;
         offset = 0;
         */
+        this.address = ARRAY_BASE_OFFSET;
 
 
 
@@ -88,6 +94,7 @@ class HeapCharBuffer
         hb = buf;
         offset = off;
         */
+        this.address = ARRAY_BASE_OFFSET + off * ARRAY_INDEX_SCALE;
 
 
 
@@ -95,13 +102,30 @@ class HeapCharBuffer
     }
 
     public CharBuffer slice() {
+        int pos = this.position();
+        int lim = this.limit();
+        int rem = (pos <= lim ? lim - pos : 0);
         return new HeapCharBuffer(hb,
                                         -1,
                                         0,
-                                        this.remaining(),
-                                        this.remaining(),
-                                        this.position() + offset);
+                                        rem,
+                                        rem,
+                                        pos + offset);
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     public CharBuffer duplicate() {
         return new HeapCharBuffer(hb,
@@ -131,6 +155,12 @@ class HeapCharBuffer
         return i + offset;
     }
 
+
+
+
+
+
+
     public char get() {
         return hb[ix(nextGetIndex())];
     }
@@ -147,10 +177,11 @@ class HeapCharBuffer
 
     public CharBuffer get(char[] dst, int offset, int length) {
         checkBounds(offset, length, dst.length);
-        if (length > remaining())
+        int pos = position();
+        if (length > limit() - pos)
             throw new BufferUnderflowException();
-        System.arraycopy(hb, ix(position()), dst, offset, length);
-        position(position() + length);
+        System.arraycopy(hb, ix(pos), dst, offset, length);
+        position(pos + length);
         return this;
     }
 
@@ -185,10 +216,11 @@ class HeapCharBuffer
     public CharBuffer put(char[] src, int offset, int length) {
 
         checkBounds(offset, length, src.length);
-        if (length > remaining())
+        int pos = position();
+        if (length > limit() - pos)
             throw new BufferOverflowException();
-        System.arraycopy(src, offset, hb, ix(position()), length);
-        position(position() + length);
+        System.arraycopy(src, offset, hb, ix(pos), length);
+        position(pos + length);
         return this;
 
 
@@ -199,21 +231,24 @@ class HeapCharBuffer
 
         if (src instanceof HeapCharBuffer) {
             if (src == this)
-                throw new IllegalArgumentException();
+                throw createSameBufferException();
             HeapCharBuffer sb = (HeapCharBuffer)src;
-            int n = sb.remaining();
-            if (n > remaining())
+            int pos = position();
+            int sbpos = sb.position();
+            int n = sb.limit() - sbpos;
+            if (n > limit() - pos)
                 throw new BufferOverflowException();
-            System.arraycopy(sb.hb, sb.ix(sb.position()),
-                             hb, ix(position()), n);
-            sb.position(sb.position() + n);
-            position(position() + n);
+            System.arraycopy(sb.hb, sb.ix(sbpos),
+                             hb, ix(pos), n);
+            sb.position(sbpos + n);
+            position(pos + n);
         } else if (src.isDirect()) {
             int n = src.remaining();
-            if (n > remaining())
+            int pos = position();
+            if (n > limit() - pos)
                 throw new BufferOverflowException();
-            src.get(hb, ix(position()), n);
-            position(position() + n);
+            src.get(hb, ix(pos), n);
+            position(pos + n);
         } else {
             super.put(src);
         }
@@ -225,8 +260,12 @@ class HeapCharBuffer
 
     public CharBuffer compact() {
 
-        System.arraycopy(hb, ix(position()), hb, ix(0), remaining());
-        position(remaining());
+        int pos = position();
+        int lim = limit();
+        assert (pos <= lim);
+        int rem = (pos <= lim ? lim - pos : 0);
+        System.arraycopy(hb, ix(pos), hb, ix(0), rem);
+        position(rem);
         limit(capacity());
         discardMark();
         return this;
@@ -234,6 +273,20 @@ class HeapCharBuffer
 
 
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -597,5 +650,9 @@ class HeapCharBuffer
     }
 
 
+
+    ByteOrder charRegionOrder() {
+        return order();
+    }
 
 }

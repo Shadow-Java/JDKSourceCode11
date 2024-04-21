@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2013, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -72,24 +72,28 @@ import java.security.Permission;
  * separated by '/' characters. <i>path</i> may also be empty. The path is specified
  * in a similar way to the path in {@link java.io.FilePermission}. There are
  * three different ways as the following examples show:
- * <table border>
+ * <table class="striped">
  * <caption>URL Examples</caption>
- * <tr><th>Example url</th><th>Description</th></tr>
- * <tr><td style="white-space:nowrap;">http://www.oracle.com/a/b/c.html</td>
+ * <thead>
+ * <tr><th scope="col">Example url</th><th scope="col">Description</th></tr>
+ * </thead>
+ * <tbody style="text-align:left">
+ * <tr><th scope="row" style="white-space:nowrap;">http://www.oracle.com/a/b/c.html</th>
  *   <td>A url which identifies a specific (single) resource</td>
  * </tr>
- * <tr><td>http://www.oracle.com/a/b/*</td>
+ * <tr><th scope="row">http://www.oracle.com/a/b/*</th>
  *   <td>The '*' character refers to all resources in the same "directory" - in
  *       other words all resources with the same number of path components, and
  *       which only differ in the final path component, represented by the '*'.
  *   </td>
  * </tr>
- * <tr><td>http://www.oracle.com/a/b/-</td>
+ * <tr><th scope="row">http://www.oracle.com/a/b/-</th>
  *   <td>The '-' character refers to all resources recursively below the
  *       preceding path (eg. http://www.oracle.com/a/b/c/d/e.html matches this
  *       example).
  *   </td>
  * </tr>
+ * </tbody>
  * </table>
  * <p>
  * The '*' and '-' may only be specified in the final segment of a path and must be
@@ -110,11 +114,12 @@ import java.security.Permission;
  * methods and permitted request headers of the permission (respectively). The two lists
  * are separated by a colon ':' character and elements of each list are comma separated.
  * Some examples are:
- * <pre>
- *         "POST,GET,DELETE"
- *         "GET:X-Foo-Request,X-Bar-Request"
- *         "POST,GET:Header1,Header2"
- * </pre>
+ * <ul>
+ * <li>"POST,GET,DELETE"
+ * <li>"GET:X-Foo-Request,X-Bar-Request"
+ * <li>"POST,GET:Header1,Header2"
+ * </ul>
+ * <p>
  * The first example specifies the methods: POST, GET and DELETE, but no request headers.
  * The second example specifies one request method and two headers. The third
  * example specifies two request methods, and two headers.
@@ -217,7 +222,7 @@ public final class URLPermission extends Permission {
      * where method-names is the list of methods separated by commas
      * and header-names is the list of permitted headers separated by commas.
      * There is no white space in the returned String. If header-names is empty
-     * then the colon separator will not be present.
+     * then the colon separator may not be present.
      */
     public String getActions() {
         return actions;
@@ -246,16 +251,20 @@ public final class URLPermission extends Permission {
      * <li>otherwise, return false</li>
      * </ul>
      * <p>Some examples of how paths are matched are shown below:
-     * <table border>
+     * <table class="plain">
      * <caption>Examples of Path Matching</caption>
-     * <tr><th>this's path</th><th>p's path</th><th>match</th></tr>
-     * <tr><td>/a/b</td><td>/a/b</td><td>yes</td></tr>
-     * <tr><td>/a/b/*</td><td>/a/b/c</td><td>yes</td></tr>
-     * <tr><td>/a/b/*</td><td>/a/b/c/d</td><td>no</td></tr>
-     * <tr><td>/a/b/-</td><td>/a/b/c/d</td><td>yes</td></tr>
-     * <tr><td>/a/b/-</td><td>/a/b/c/d/e</td><td>yes</td></tr>
-     * <tr><td>/a/b/-</td><td>/a/b/c/*</td><td>yes</td></tr>
-     * <tr><td>/a/b/*</td><td>/a/b/c/-</td><td>no</td></tr>
+     * <thead>
+     * <tr><th scope="col">this's path</th><th scope="col">p's path</th><th>match</th></tr>
+     * </thead>
+     * <tbody style="text-align:left">
+     * <tr><th scope="row">/a/b</th><th scope="row">/a/b</th><td>yes</td></tr>
+     * <tr><th scope="row" rowspan="3">/a/b/*</th><th scope="row">/a/b/c</th><td>yes</td></tr>
+     * <tr>  <th scope="row">/a/b/c/d</th><td>no</td></tr>
+     * <tr>  <th scope="row">/a/b/c/-</th><td>no</td></tr>
+     * <tr><th scope="row" rowspan="3">/a/b/-</th><th scope="row">/a/b/c/d</th><td>yes</td></tr>
+     * <tr>  <th scope="row">/a/b/c/d/e</th><td>yes</td></tr>
+     * <tr>  <th scope="row">/a/b/c/*</th><td>yes</td></tr>
+     * </tbody>
      * </table>
      */
     public boolean implies(Permission p) {
@@ -265,8 +274,14 @@ public final class URLPermission extends Permission {
 
         URLPermission that = (URLPermission)p;
 
-        if (!this.methods.get(0).equals("*") &&
-                Collections.indexOfSubList(this.methods, that.methods) == -1) {
+        if (this.methods.isEmpty() && !that.methods.isEmpty()) {
+            return false;
+        }
+
+        if (!this.methods.isEmpty() &&
+            !this.methods.get(0).equals("*") &&
+            Collections.indexOfSubList(this.methods,
+                                       that.methods) == -1) {
             return false;
         }
 
@@ -368,7 +383,7 @@ public final class URLPermission extends Permission {
             char c = methods.charAt(i);
             if (c == ',') {
                 String s = b.toString();
-                if (s.length() > 0)
+                if (!s.isEmpty())
                     l.add(s);
                 b = new StringBuilder();
             } else if (c == ' ' || c == '\t') {
@@ -382,7 +397,7 @@ public final class URLPermission extends Permission {
             }
         }
         String s = b.toString();
-        if (s.length() > 0)
+        if (!s.isEmpty())
             l.add(s);
         return l;
     }
@@ -407,7 +422,7 @@ public final class URLPermission extends Permission {
                 b.append(c);
             } else if (c == ',') {
                 String s = b.toString();
-                if (s.length() > 0)
+                if (!s.isEmpty())
                     l.add(s);
                 b = new StringBuilder();
                 capitalizeNext = true;
@@ -417,7 +432,7 @@ public final class URLPermission extends Permission {
             }
         }
         String s = b.toString();
-        if (s.length() > 0)
+        if (!s.isEmpty())
             l.add(s);
         return l;
     }
@@ -455,15 +470,10 @@ public final class URLPermission extends Permission {
     }
 
     private String actions() {
-        StringBuilder b = new StringBuilder();
-        for (String s : methods) {
-            b.append(s);
-        }
-        b.append(":");
-        for (String s : requestHeaders) {
-            b.append(s);
-        }
-        return b.toString();
+        // The colon separator is optional when the request headers list is
+        // empty.This implementation chooses to include it even when the request
+        // headers list is empty.
+        return String.join(",", methods) + ":" + String.join(",", requestHeaders);
     }
 
     /**

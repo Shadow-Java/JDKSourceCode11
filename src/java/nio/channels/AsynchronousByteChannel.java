@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.channels;
@@ -70,13 +70,13 @@ public interface AsynchronousByteChannel
      * {@code 0} without initiating an I/O operation.
      *
      * <p> Suppose that a byte sequence of length <i>n</i> is read, where
-     * <tt>0</tt>&nbsp;<tt>&lt;</tt>&nbsp;<i>n</i>&nbsp;<tt>&lt;=</tt>&nbsp;<i>r</i>.
+     * {@code 0}&nbsp;{@code <}&nbsp;<i>n</i>&nbsp;{@code <=}&nbsp;<i>r</i>.
      * This byte sequence will be transferred into the buffer so that the first
      * byte in the sequence is at index <i>p</i> and the last byte is at index
-     * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>&nbsp;<tt>-</tt>&nbsp;<tt>1</tt>,
+     * <i>p</i>&nbsp;{@code +}&nbsp;<i>n</i>&nbsp;{@code -}&nbsp;{@code 1},
      * where <i>p</i> is the buffer's position at the moment the read is
      * performed. Upon completion the buffer's position will be equal to
-     * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>; its limit will not have changed.
+     * <i>p</i>&nbsp;{@code +}&nbsp;<i>n</i>; its limit will not have changed.
      *
      * <p> Buffers are not safe for use by multiple concurrent threads so care
      * should be taken to not access the buffer until the operation has
@@ -151,13 +151,13 @@ public interface AsynchronousByteChannel
      * {@code 0} without initiating an I/O operation.
      *
      * <p> Suppose that a byte sequence of length <i>n</i> is written, where
-     * <tt>0</tt>&nbsp;<tt>&lt;</tt>&nbsp;<i>n</i>&nbsp;<tt>&lt;=</tt>&nbsp;<i>r</i>.
+     * {@code 0}&nbsp;{@code <}&nbsp;<i>n</i>&nbsp;{@code <=}&nbsp;<i>r</i>.
      * This byte sequence will be transferred from the buffer starting at index
      * <i>p</i>, where <i>p</i> is the buffer's position at the moment the
      * write is performed; the index of the last byte written will be
-     * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>&nbsp;<tt>-</tt>&nbsp;<tt>1</tt>.
+     * <i>p</i>&nbsp;{@code +}&nbsp;<i>n</i>&nbsp;{@code -}&nbsp;{@code 1}.
      * Upon completion the buffer's position will be equal to
-     * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>; its limit will not have changed.
+     * <i>p</i>&nbsp;{@code +}&nbsp;<i>n</i>; its limit will not have changed.
      *
      * <p> Buffers are not safe for use by multiple concurrent threads so care
      * should be taken to not access the buffer until the operation has

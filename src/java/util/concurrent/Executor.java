@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -41,33 +41,31 @@ package java.util.concurrent;
  * mechanics of how each task will be run, including details of thread
  * use, scheduling, etc.  An {@code Executor} is normally used
  * instead of explicitly creating threads. For example, rather than
- * invoking {@code new Thread(new(RunnableTask())).start()} for each
+ * invoking {@code new Thread(new RunnableTask()).start()} for each
  * of a set of tasks, you might use:
  *
- * <pre>
- * Executor executor = <em>anExecutor</em>;
+ * <pre> {@code
+ * Executor executor = anExecutor();
  * executor.execute(new RunnableTask1());
  * executor.execute(new RunnableTask2());
- * ...
- * </pre>
+ * ...}</pre>
  *
- * However, the {@code Executor} interface does not strictly
- * require that execution be asynchronous. In the simplest case, an
- * executor can run the submitted task immediately in the caller's
- * thread:
+ * However, the {@code Executor} interface does not strictly require
+ * that execution be asynchronous. In the simplest case, an executor
+ * can run the submitted task immediately in the caller's thread:
  *
- *  <pre> {@code
+ * <pre> {@code
  * class DirectExecutor implements Executor {
  *   public void execute(Runnable r) {
  *     r.run();
  *   }
  * }}</pre>
  *
- * More typically, tasks are executed in some thread other
- * than the caller's thread.  The executor below spawns a new thread
- * for each task.
+ * More typically, tasks are executed in some thread other than the
+ * caller's thread.  The executor below spawns a new thread for each
+ * task.
  *
- *  <pre> {@code
+ * <pre> {@code
  * class ThreadPerTaskExecutor implements Executor {
  *   public void execute(Runnable r) {
  *     new Thread(r).start();
@@ -79,9 +77,9 @@ package java.util.concurrent;
  * serializes the submission of tasks to a second executor,
  * illustrating a composite executor.
  *
- *  <pre> {@code
+ * <pre> {@code
  * class SerialExecutor implements Executor {
- *   final Queue<Runnable> tasks = new ArrayDeque<Runnable>();
+ *   final Queue<Runnable> tasks = new ArrayDeque<>();
  *   final Executor executor;
  *   Runnable active;
  *
@@ -89,14 +87,12 @@ package java.util.concurrent;
  *     this.executor = executor;
  *   }
  *
- *   public synchronized void execute(final Runnable r) {
- *     tasks.offer(new Runnable() {
- *       public void run() {
- *         try {
- *           r.run();
- *         } finally {
- *           scheduleNext();
- *         }
+ *   public synchronized void execute(Runnable r) {
+ *     tasks.add(() -> {
+ *       try {
+ *         r.run();
+ *       } finally {
+ *         scheduleNext();
  *       }
  *     });
  *     if (active == null) {

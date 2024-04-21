@@ -1,31 +1,31 @@
 /*
  * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
 
-import sun.misc.IOUtils;
+import sun.security.util.IOUtils;
 
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -100,6 +100,7 @@ import java.util.List;
  *
  *
  * @author Roland Schemers
+ * @since 1.2
  */
 
 public final class UnresolvedPermission extends Permission
@@ -134,7 +135,7 @@ implements java.io.Serializable
      */
     private String actions;
 
-    private transient java.security.cert.Certificate certs[];
+    private transient java.security.cert.Certificate[] certs;
 
     /**
      * Creates a new UnresolvedPermission containing the permission
@@ -156,7 +157,7 @@ implements java.io.Serializable
     public UnresolvedPermission(String type,
                                 String name,
                                 String actions,
-                                java.security.cert.Certificate certs[])
+                                java.security.cert.Certificate[] certs)
     {
         super(type);
 
@@ -220,15 +221,15 @@ implements java.io.Serializable
     }
 
 
-    private static final Class[] PARAMS0 = { };
-    private static final Class[] PARAMS1 = { String.class };
-    private static final Class[] PARAMS2 = { String.class, String.class };
+    private static final Class<?>[] PARAMS0 = { };
+    private static final Class<?>[] PARAMS1 = { String.class };
+    private static final Class<?>[] PARAMS2 = { String.class, String.class };
 
     /**
      * try and resolve this permission using the class loader of the permission
      * that was passed in.
      */
-    Permission resolve(Permission p, java.security.cert.Certificate certs[]) {
+    Permission resolve(Permission p, java.security.cert.Certificate[] certs) {
         if (this.certs != null) {
             // if p wasn't signed, we don't have a match
             if (certs == null) {
@@ -314,7 +315,7 @@ implements java.io.Serializable
 
     /**
      * Checks two UnresolvedPermission objects for equality.
-     * Checks that <i>obj</i> is an UnresolvedPermission, and has
+     * Checks that {@code obj} is an UnresolvedPermission, and has
      * the same type (class) name, permission name, actions, and
      * certificates as this object.
      *
@@ -495,7 +496,7 @@ implements java.io.Serializable
     /**
      * Returns a new PermissionCollection object for storing
      * UnresolvedPermission  objects.
-     * <p>
+     *
      * @return a new PermissionCollection object suitable for
      * storing UnresolvedPermissions.
      */
@@ -590,7 +591,7 @@ implements java.io.Serializable
                 cfs.put(certType, cf);
             }
             // parse the certificate
-            byte[] encoded = IOUtils.readNBytes(ois, ois.readInt());
+            byte[] encoded = IOUtils.readExactlyNBytes(ois, ois.readInt());
             ByteArrayInputStream bais = new ByteArrayInputStream(encoded);
             try {
                 certList.add(cf.generateCertificate(bais));

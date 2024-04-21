@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -90,7 +90,7 @@
  * The calendar neutral API should be reserved for interactions with users.
  * </p>
  *
- * <h3>Dates and Times</h3>
+ * <h2>Dates and Times</h2>
  * <p>
  * {@link java.time.Instant} is essentially a numeric timestamp.
  * The current Instant can be retrieved from a {@link java.time.Clock}.
@@ -118,7 +118,7 @@
  * The widespread use of time-zones tends to add considerable complexity to an application.
  * </p>
  *
- * <h3>Duration and Period</h3>
+ * <h2>Duration and Period</h2>
  * <p>
  * Beyond dates and times, the API also allows the storage of periods and durations of time.
  * A {@link java.time.Duration} is a simple measure of time along the time-line in nanoseconds.
@@ -126,7 +126,7 @@
  * to humans, such as years or days.
  * </p>
  *
- * <h3>Additional value types</h3>
+ * <h2>Additional value types</h2>
  * <p>
  * {@link java.time.Month} stores a month on its own.
  * This stores a single month-of-year in isolation, such as 'DECEMBER'.
@@ -160,7 +160,7 @@
  * but contains less information than a full time-zone.
  * </p>
  *
- * <h3>Package specification</h3>
+ * <h2>Package specification</h2>
  * <p>
  * Unless otherwise noted, passing a null argument to a constructor or method in any class or interface
  * in this package will cause a {@link java.lang.NullPointerException NullPointerException} to be thrown.
@@ -172,7 +172,7 @@
  * or a {@link java.time.DateTimeException}.
  * </p>
  *
- * <h3>Design notes (non normative)</h3>
+ * <h2>Design notes (non normative)</h2>
  * <p>
  * The API has been designed to reject null early and to be clear about this behavior.
  * A key exception is any method that takes an object and returns a boolean, for the purpose
@@ -283,6 +283,6 @@
  *
  * </pre>
  *
- * @since JDK1.8
+ * @since 1.8
  */
 package java.time;

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
@@ -32,10 +32,10 @@ import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import static java.io.ObjectStreamClass.processQueue;
-import java.io.SerialCallbackContext;
 import sun.reflect.misc.ReflectUtil;
 
 /**
@@ -156,8 +156,9 @@ import sun.reflect.misc.ReflectUtil;
  * @see java.io.ObjectInputStream
  * @see java.io.Serializable
  * @see java.io.Externalizable
- * @see <a href="../../../platform/serialization/spec/output.html">Object Serialization Specification, Section 2, Object Output Classes</a>
- * @since       JDK1.1
+ * @see <a href="{@docRoot}/../specs/serialization/output.html">
+ *     Object Serialization Specification, Section 2, Object Output Classes</a>
+ * @since       1.1
  */
 public class ObjectOutputStream
     extends OutputStream implements ObjectOutput, ObjectStreamConstants
@@ -458,7 +459,7 @@ public class ObjectOutputStream
             if (ctx == null) {
                 throw new NotActiveException("not in call to writeObject");
             }
-            Object curObj = ctx.getObj();
+            ctx.checkAndSetUsed();
             ObjectStreamClass curDesc = ctx.getDesc();
             curPut = new PutFieldImpl(curDesc);
         }
@@ -589,22 +590,24 @@ public class ObjectOutputStream
     }
 
     /**
-     * Enable the stream to do replacement of objects in the stream.  When
-     * enabled, the replaceObject method is called for every object being
+     * Enables the stream to do replacement of objects written to the stream.  When
+     * enabled, the {@link #replaceObject} method is called for every object being
      * serialized.
      *
-     * <p>If <code>enable</code> is true, and there is a security manager
-     * installed, this method first calls the security manager's
-     * <code>checkPermission</code> method with a
-     * <code>SerializablePermission("enableSubstitution")</code> permission to
-     * ensure it's ok to enable the stream to do replacement of objects in the
-     * stream.
+     * <p>If object replacement is currently not enabled, and
+     * {@code enable} is true, and there is a security manager installed,
+     * this method first calls the security manager's
+     * {@code checkPermission} method with the
+     * {@code SerializablePermission("enableSubstitution")} permission to
+     * ensure that the caller is permitted to enable the stream to do replacement
+     * of objects written to the stream.
      *
-     * @param   enable boolean parameter to enable replacement of objects
+     * @param   enable true for enabling use of {@code replaceObject} for
+     *          every object being serialized
      * @return  the previous setting before this method was invoked
      * @throws  SecurityException if a security manager exists and its
-     *          <code>checkPermission</code> method denies enabling the stream
-     *          to do replacement of objects in the stream.
+     *          {@code checkPermission} method denies enabling the stream
+     *          to do replacement of objects written to the stream.
      * @see SecurityManager#checkPermission
      * @see java.io.SerializablePermission
      */
@@ -875,7 +878,7 @@ public class ObjectOutputStream
      *
      * @since 1.2
      */
-    public static abstract class PutField {
+    public abstract static class PutField {
 
         /**
          * Put the value of the named boolean field into the persistent field.
@@ -1050,23 +1053,22 @@ public class ObjectOutputStream
         WeakClassKey key = new WeakClassKey(cl, Caches.subclassAuditsQueue);
         Boolean result = Caches.subclassAudits.get(key);
         if (result == null) {
-            result = Boolean.valueOf(auditSubclass(cl));
+            result = auditSubclass(cl);
             Caches.subclassAudits.putIfAbsent(key, result);
         }
-        if (result.booleanValue()) {
-            return;
+        if (!result) {
+            sm.checkPermission(SUBCLASS_IMPLEMENTATION_PERMISSION);
         }
-        sm.checkPermission(SUBCLASS_IMPLEMENTATION_PERMISSION);
     }
 
     /**
      * Performs reflective checks on given subclass to verify that it doesn't
-     * override security-sensitive non-final methods.  Returns true if subclass
-     * is "safe", false otherwise.
+     * override security-sensitive non-final methods.  Returns TRUE if subclass
+     * is "safe", FALSE otherwise.
      */
-    private static boolean auditSubclass(final Class<?> subcl) {
-        Boolean result = AccessController.doPrivileged(
-            new PrivilegedAction<Boolean>() {
+    private static Boolean auditSubclass(Class<?> subcl) {
+        return AccessController.doPrivileged(
+            new PrivilegedAction<>() {
                 public Boolean run() {
                     for (Class<?> cl = subcl;
                          cl != ObjectOutputStream.class;
@@ -1088,7 +1090,6 @@ public class ObjectOutputStream
                 }
             }
         );
-        return result.booleanValue();
     }
 
     /**
@@ -1527,29 +1528,34 @@ public class ObjectOutputStream
         desc.checkDefaultSerialize();
 
         int primDataSize = desc.getPrimDataSize();
-        if (primVals == null || primVals.length < primDataSize) {
-            primVals = new byte[primDataSize];
-        }
-        desc.getPrimFieldValues(obj, primVals);
-        bout.write(primVals, 0, primDataSize, false);
-
-        ObjectStreamField[] fields = desc.getFields(false);
-        Object[] objVals = new Object[desc.getNumObjFields()];
-        int numPrimFields = fields.length - objVals.length;
-        desc.getObjFieldValues(obj, objVals);
-        for (int i = 0; i < objVals.length; i++) {
-            if (extendedDebugInfo) {
-                debugInfoStack.push(
-                    "field (class \"" + desc.getName() + "\", name: \"" +
-                    fields[numPrimFields + i].getName() + "\", type: \"" +
-                    fields[numPrimFields + i].getType() + "\")");
+        if (primDataSize > 0) {
+            if (primVals == null || primVals.length < primDataSize) {
+                primVals = new byte[primDataSize];
             }
-            try {
-                writeObject0(objVals[i],
-                             fields[numPrimFields + i].isUnshared());
-            } finally {
+            desc.getPrimFieldValues(obj, primVals);
+            bout.write(primVals, 0, primDataSize, false);
+        }
+
+        int numObjFields = desc.getNumObjFields();
+        if (numObjFields > 0) {
+            ObjectStreamField[] fields = desc.getFields(false);
+            Object[] objVals = new Object[numObjFields];
+            int numPrimFields = fields.length - objVals.length;
+            desc.getObjFieldValues(obj, objVals);
+            for (int i = 0; i < objVals.length; i++) {
                 if (extendedDebugInfo) {
-                    debugInfoStack.pop();
+                    debugInfoStack.push(
+                        "field (class \"" + desc.getName() + "\", name: \"" +
+                        fields[numPrimFields + i].getName() + "\", type: \"" +
+                        fields[numPrimFields + i].getType() + "\")");
+                }
+                try {
+                    writeObject0(objVals[i],
+                                 fields[numPrimFields + i].isUnshared());
+                } finally {
+                    if (extendedDebugInfo) {
+                        debugInfoStack.pop();
+                    }
                 }
             }
         }
@@ -2461,13 +2467,11 @@ public class ObjectOutputStream
          * Returns a string representation of this object
          */
         public String toString() {
-            StringBuilder buffer = new StringBuilder();
-            if (!stack.isEmpty()) {
-                for(int i = stack.size(); i > 0; i-- ) {
-                    buffer.append(stack.get(i-1) + ((i != 1) ? "\n" : ""));
-                }
+            StringJoiner sj = new StringJoiner("\n");
+            for (int i = stack.size() - 1; i >= 0; i--) {
+                sj.add(stack.get(i));
             }
-            return buffer.toString();
+            return sj.toString();
         }
     }
 

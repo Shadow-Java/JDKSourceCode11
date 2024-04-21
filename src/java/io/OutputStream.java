@@ -1,29 +1,31 @@
 /*
- * Copyright (c) 1994, 2004, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1994, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
+
+import java.util.Objects;
 
 /**
  * This abstract class is the superclass of all classes representing
@@ -41,9 +43,54 @@ package java.io;
  * @see     java.io.FilterOutputStream
  * @see     java.io.InputStream
  * @see     java.io.OutputStream#write(int)
- * @since   JDK1.0
+ * @since   1.0
  */
 public abstract class OutputStream implements Closeable, Flushable {
+    /**
+     * Returns a new {@code OutputStream} which discards all bytes.  The
+     * returned stream is initially open.  The stream is closed by calling
+     * the {@code close()} method.  Subsequent calls to {@code close()} have
+     * no effect.
+     *
+     * <p> While the stream is open, the {@code write(int)}, {@code
+     * write(byte[])}, and {@code write(byte[], int, int)} methods do nothing.
+     * After the stream has been closed, these methods all throw {@code
+     * IOException}.
+     *
+     * <p> The {@code flush()} method does nothing.
+     *
+     * @return an {@code OutputStream} which discards all bytes
+     *
+     * @since 11
+     */
+    public static OutputStream nullOutputStream() {
+        return new OutputStream() {
+            private volatile boolean closed;
+
+            private void ensureOpen() throws IOException {
+                if (closed) {
+                    throw new IOException("Stream closed");
+                }
+            }
+
+            @Override
+            public void write(int b) throws IOException {
+                ensureOpen();
+            }
+
+            @Override
+            public void write(byte b[], int off, int len) throws IOException {
+                Objects.checkFromIndexSize(off, len, b.length);
+                ensureOpen();
+            }
+
+            @Override
+            public void close() {
+                closed = true;
+            }
+        };
+    }
+
     /**
      * Writes the specified byte to this output stream. The general
      * contract for <code>write</code> is that one byte is written
@@ -94,7 +141,7 @@ public abstract class OutputStream implements Closeable, Flushable {
      * <p>
      * If <code>off</code> is negative, or <code>len</code> is negative, or
      * <code>off+len</code> is greater than the length of the array
-     * <code>b</code>, then an <tt>IndexOutOfBoundsException</tt> is thrown.
+     * {@code b}, then an {@code IndexOutOfBoundsException} is thrown.
      *
      * @param      b     the data.
      * @param      off   the start offset in the data.
@@ -104,14 +151,8 @@ public abstract class OutputStream implements Closeable, Flushable {
      *             stream is closed.
      */
     public void write(byte b[], int off, int len) throws IOException {
-        if (b == null) {
-            throw new NullPointerException();
-        } else if ((off < 0) || (off > b.length) || (len < 0) ||
-                   ((off + len) > b.length) || ((off + len) < 0)) {
-            throw new IndexOutOfBoundsException();
-        } else if (len == 0) {
-            return;
-        }
+        Objects.checkFromIndexSize(off, len, b.length);
+        // len == 0 condition implicitly handled by loop bounds
         for (int i = 0 ; i < len ; i++) {
             write(b[off + i]);
         }

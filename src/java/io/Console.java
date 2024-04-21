@@ -1,32 +1,34 @@
 /*
  * Copyright (c) 2005, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
 
 import java.util.*;
 import java.nio.charset.Charset;
+import jdk.internal.misc.JavaIOAccess;
+import jdk.internal.misc.SharedSecrets;
 import sun.nio.cs.StreamDecoder;
 import sun.nio.cs.StreamEncoder;
 
@@ -47,7 +49,7 @@ import sun.nio.cs.StreamEncoder;
  * If this virtual machine has a console then it is represented by a
  * unique instance of this class which can be obtained by invoking the
  * {@link java.lang.System#console()} method.  If no console device is
- * available then an invocation of that method will return <tt>null</tt>.
+ * available then an invocation of that method will return {@code null}.
  * <p>
  * Read and write operations are synchronized to guarantee the atomic
  * completion of critical operations; therefore invoking methods
@@ -56,17 +58,17 @@ import sun.nio.cs.StreamEncoder;
  * on the objects returned by {@link #reader()} and {@link #writer()} may
  * block in multithreaded scenarios.
  * <p>
- * Invoking <tt>close()</tt> on the objects returned by the {@link #reader()}
+ * Invoking {@code close()} on the objects returned by the {@link #reader()}
  * and the {@link #writer()} will not close the underlying stream of those
  * objects.
  * <p>
- * The console-read methods return <tt>null</tt> when the end of the
+ * The console-read methods return {@code null} when the end of the
  * console input stream is reached, for example by typing control-D on
  * Unix or control-Z on Windows.  Subsequent read operations will succeed
  * if additional characters are later entered on the console's input
  * device.
  * <p>
- * Unless otherwise specified, passing a <tt>null</tt> argument to any method
+ * Unless otherwise specified, passing a {@code null} argument to any method
  * in this class will cause a {@link NullPointerException} to be thrown.
  * <p>
  * <b>Security note:</b>
@@ -107,7 +109,7 @@ public final class Console implements Flushable
     * <p>
     * This method is intended to be used by sophisticated applications, for
     * example, a {@link java.util.Scanner} object which utilizes the rich
-    * parsing/scanning functionality provided by the <tt>Scanner</tt>:
+    * parsing/scanning functionality provided by the {@code Scanner}:
     * <blockquote><pre>
     * Console con = System.console();
     * if (con != null) {
@@ -117,7 +119,7 @@ public final class Console implements Flushable
     * </pre></blockquote>
     * <p>
     * For simple applications requiring only line-oriented reading, use
-    * <tt>{@link #readLine}</tt>.
+    * {@link #readLine}.
     * <p>
     * The bulk read operations {@link java.io.Reader#read(char[]) read(char[]) },
     * {@link java.io.Reader#read(char[], int, int) read(char[], int, int) } and
@@ -126,8 +128,8 @@ public final class Console implements Flushable
     * bound for each invocation, even if the destination buffer has space for
     * more characters. The {@code Reader}'s {@code read} methods may block if a
     * line bound has not been entered or reached on the console's input device.
-    * A line bound is considered to be any one of a line feed (<tt>'\n'</tt>),
-    * a carriage return (<tt>'\r'</tt>), a carriage return followed immediately
+    * A line bound is considered to be any one of a line feed ({@code '\n'}),
+    * a carriage return ({@code '\r'}), a carriage return followed immediately
     * by a linefeed, or an end of stream.
     *
     * @return  The reader associated with this console
@@ -152,7 +154,7 @@ public final class Console implements Flushable
     *         limited by the maximum dimension of a Java array as defined by
     *         <cite>The Java&trade; Virtual Machine Specification</cite>.
     *         The behaviour on a
-    *         <tt>null</tt> argument depends on the <a
+    *         {@code null} argument depends on the <a
     *         href="../util/Formatter.html#syntax">conversion</a>.
     *
     * @throws  IllegalFormatException
@@ -175,8 +177,9 @@ public final class Console implements Flushable
     * A convenience method to write a formatted string to this console's
     * output stream using the specified format string and arguments.
     *
-    * <p> An invocation of this method of the form <tt>con.printf(format,
-    * args)</tt> behaves in exactly the same way as the invocation of
+    * <p> An invocation of this method of the form
+    * {@code con.printf(format, args)} behaves in exactly the same way
+    * as the invocation of
     * <pre>con.format(format, args)</pre>.
     *
     * @param  format
@@ -191,7 +194,7 @@ public final class Console implements Flushable
     *         limited by the maximum dimension of a Java array as defined by
     *         <cite>The Java&trade; Virtual Machine Specification</cite>.
     *         The behaviour on a
-    *         <tt>null</tt> argument depends on the <a
+    *         {@code null} argument depends on the <a
     *         href="../util/Formatter.html#syntax">conversion</a>.
     *
     * @throws  IllegalFormatException
@@ -237,14 +240,14 @@ public final class Console implements Flushable
     *         If an I/O error occurs.
     *
     * @return  A string containing the line read from the console, not
-    *          including any line-termination characters, or <tt>null</tt>
+    *          including any line-termination characters, or {@code null}
     *          if an end of stream has been reached.
     */
     public String readLine(String fmt, Object ... args) {
         String line = null;
         synchronized (writeLock) {
             synchronized(readLock) {
-                if (fmt.length() != 0)
+                if (!fmt.isEmpty())
                     pw.format(fmt, args);
                 try {
                     char[] ca = readline(false);
@@ -265,7 +268,7 @@ public final class Console implements Flushable
     *         If an I/O error occurs.
     *
     * @return  A string containing the line read from the console, not
-    *          including any line-termination characters, or <tt>null</tt>
+    *          including any line-termination characters, or {@code null}
     *          if an end of stream has been reached.
     */
     public String readLine() {
@@ -302,27 +305,29 @@ public final class Console implements Flushable
     *
     * @return  A character array containing the password or passphrase read
     *          from the console, not including any line-termination characters,
-    *          or <tt>null</tt> if an end of stream has been reached.
+    *          or {@code null} if an end of stream has been reached.
     */
     public char[] readPassword(String fmt, Object ... args) {
         char[] passwd = null;
         synchronized (writeLock) {
             synchronized(readLock) {
+                installShutdownHook();
                 try {
-                    echoOff = echo(false);
+                    restoreEcho = echo(false);
                 } catch (IOException x) {
                     throw new IOError(x);
                 }
                 IOError ioe = null;
                 try {
-                    if (fmt.length() != 0)
+                    if (!fmt.isEmpty())
                         pw.format(fmt, args);
                     passwd = readline(true);
                 } catch (IOException x) {
                     ioe = new IOError(x);
                 } finally {
                     try {
-                        echoOff = echo(true);
+                        if (restoreEcho)
+                            restoreEcho = echo(true);
                     } catch (IOException x) {
                         if (ioe == null)
                             ioe = new IOError(x);
@@ -338,6 +343,31 @@ public final class Console implements Flushable
         return passwd;
     }
 
+    private void installShutdownHook() {
+        if (shutdownHookInstalled)
+            return;
+        try {
+            // Add a shutdown hook to restore console's echo state should
+            // it be necessary.
+            SharedSecrets.getJavaLangAccess()
+                .registerShutdownHook(0 /* shutdown hook invocation order */,
+                    false /* only register if shutdown is not in progress */,
+                    new Runnable() {
+                        public void run() {
+                            try {
+                                if (restoreEcho) {
+                                    echo(true);
+                                }
+                            } catch (IOException x) { }
+                        }
+                    });
+        } catch (IllegalStateException e) {
+            // shutdown is already in progress and readPassword is first used
+            // by a shutdown hook
+        }
+        shutdownHookInstalled = true;
+    }
+
    /**
     * Reads a password or passphrase from the console with echoing disabled
     *
@@ -346,7 +376,7 @@ public final class Console implements Flushable
     *
     * @return  A character array containing the password or passphrase read
     *          from the console, not including any line-termination characters,
-    *          or <tt>null</tt> if an end of stream has been reached.
+    *          or {@code null} if an end of stream has been reached.
     */
     public char[] readPassword() {
         return readPassword("");
@@ -368,9 +398,17 @@ public final class Console implements Flushable
     private Formatter formatter;
     private Charset cs;
     private char[] rcb;
+    private boolean restoreEcho;
+    private boolean shutdownHookInstalled;
     private static native String encoding();
+    /*
+     * Sets the console echo status to {@code on} and returns the previous
+     * console on/off status.
+     * @param on    the echo status to set to. {@code true} for echo on and
+     *              {@code false} for echo off
+     * @return true if the previous console echo status is on
+     */
     private static native boolean echo(boolean on) throws IOException;
-    private static boolean echoOff;
 
     private char[] readline(boolean zeroOut) throws IOException {
         int len = reader.read(rcb, 0, rcb.length);
@@ -515,27 +553,7 @@ public final class Console implements Flushable
 
     // Set up JavaIOAccess in SharedSecrets
     static {
-        try {
-            // Add a shutdown hook to restore console's echo state should
-            // it be necessary.
-            sun.misc.SharedSecrets.getJavaLangAccess()
-                .registerShutdownHook(0 /* shutdown hook invocation order */,
-                    false /* only register if shutdown is not in progress */,
-                    new Runnable() {
-                        public void run() {
-                            try {
-                                if (echoOff) {
-                                    echo(true);
-                                }
-                            } catch (IOException x) { }
-                        }
-                    });
-        } catch (IllegalStateException e) {
-            // shutdown is already in progress and console is first used
-            // by a shutdown hook
-        }
-
-        sun.misc.SharedSecrets.setJavaIOAccess(new sun.misc.JavaIOAccess() {
+        SharedSecrets.setJavaIOAccess(new JavaIOAccess() {
             public Console console() {
                 if (istty()) {
                     if (cons == null)
@@ -553,7 +571,7 @@ public final class Console implements Flushable
         });
     }
     private static Console cons;
-    private native static boolean istty();
+    private static native boolean istty();
     private Console() {
         readLock = new Object();
         writeLock = new Object();

@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.lang.reflect;
 
@@ -173,7 +173,7 @@ public final class Parameter implements AnnotatedElement {
      *         a name.
      */
     public String getName() {
-        // Note: empty strings as paramete names are now outlawed.
+        // Note: empty strings as parameter names are now outlawed.
         // The .equals("") is for compatibility with current JVM
         // behavior.  It may be removed at some point.
         if(name == null || name.equals(""))
@@ -205,7 +205,7 @@ public final class Parameter implements AnnotatedElement {
         return tmp;
     }
 
-    private transient volatile Type parameterTypeCache = null;
+    private transient volatile Type parameterTypeCache;
 
     /**
      * Returns a {@code Class} object that identifies the
@@ -237,7 +237,7 @@ public final class Parameter implements AnnotatedElement {
         return executable.getAnnotatedParameterTypes()[index];
     }
 
-    private transient volatile Class<?> parameterClassCache = null;
+    private transient volatile Class<?> parameterClassCache;
 
     /**
      * Returns {@code true} if this parameter is implicitly declared
@@ -337,11 +337,9 @@ public final class Parameter implements AnnotatedElement {
 
     private synchronized Map<Class<? extends Annotation>, Annotation> declaredAnnotations() {
         if(null == declaredAnnotations) {
-            declaredAnnotations =
-                new HashMap<Class<? extends Annotation>, Annotation>();
-            Annotation[] ann = getDeclaredAnnotations();
-            for(int i = 0; i < ann.length; i++)
-                declaredAnnotations.put(ann[i].annotationType(), ann[i]);
+            declaredAnnotations = new HashMap<>();
+            for (Annotation a : getDeclaredAnnotations())
+                declaredAnnotations.put(a.annotationType(), a);
         }
         return declaredAnnotations;
    }

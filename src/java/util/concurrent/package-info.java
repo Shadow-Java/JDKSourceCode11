@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -200,7 +200,7 @@
  * concurrent collection is thread-safe, but not governed by a
  * single exclusion lock.  In the particular case of
  * ConcurrentHashMap, it safely permits any number of
- * concurrent reads as well as a tunable number of concurrent
+ * concurrent reads as well as a large number of concurrent
  * writes.  "Synchronized" classes can be useful when you need
  * to prevent all access to a collection via a single lock, at
  * the expense of poorer scalability.  In other cases in which
@@ -226,8 +226,9 @@
  *
  * <h2 id="MemoryVisibility">Memory Consistency Properties</h2>
  *
- * <a href="https://docs.oracle.com/javase/specs/jls/se7/html/jls-17.html#jls-17.4.5">
- * Chapter 17 of the Java Language Specification</a> defines the
+ * <a href="https://docs.oracle.com/javase/specs/jls/se8/html/jls-17.html#jls-17.4.5">
+ * Chapter 17 of
+ * <cite>The Java&trade; Language Specification</cite></a> defines the
  * <i>happens-before</i> relation on memory operations such as reads and
  * writes of shared variables.  The results of a write by one thread are
  * guaranteed to be visible to a read by another thread only if the write
@@ -260,7 +261,6 @@
  *   successfully returns from a {@code join} on that thread.
  *
  * </ul>
- *
  *
  * The methods of all classes in {@code java.util.concurrent} and its
  * subpackages extend these guarantees to higher-level

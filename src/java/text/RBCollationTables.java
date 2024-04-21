@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1999, 2012, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
@@ -258,7 +258,7 @@ final class RBCollationTables {
         }
     }
 
-    final static int getEntry(Vector<EntryPair> list, String name, boolean fwd) {
+    static final int getEntry(Vector<EntryPair> list, String name, boolean fwd) {
         for (int i = 0; i < list.size(); i++) {
             EntryPair pair = list.elementAt(i);
             if (pair.fwd == fwd && pair.entryName.equals(name)) {
@@ -272,17 +272,17 @@ final class RBCollationTables {
     // constants
     // ==============================================================
     //sherman/Todo: is the value big enough?????
-    final static int EXPANDCHARINDEX = 0x7E000000; // Expand index follows
-    final static int CONTRACTCHARINDEX = 0x7F000000;  // contract indexes follow
-    final static int UNMAPPED = 0xFFFFFFFF;
+    static final int EXPANDCHARINDEX = 0x7E000000; // Expand index follows
+    static final int CONTRACTCHARINDEX = 0x7F000000;  // contract indexes follow
+    static final int UNMAPPED = 0xFFFFFFFF;
 
-    final static int PRIMARYORDERMASK = 0xffff0000;
-    final static int SECONDARYORDERMASK = 0x0000ff00;
-    final static int TERTIARYORDERMASK = 0x000000ff;
-    final static int PRIMARYDIFFERENCEONLY = 0xffff0000;
-    final static int SECONDARYDIFFERENCEONLY = 0xffffff00;
-    final static int PRIMARYORDERSHIFT = 16;
-    final static int SECONDARYORDERSHIFT = 8;
+    static final int PRIMARYORDERMASK = 0xffff0000;
+    static final int SECONDARYORDERMASK = 0x0000ff00;
+    static final int TERTIARYORDERMASK = 0x000000ff;
+    static final int PRIMARYDIFFERENCEONLY = 0xffff0000;
+    static final int SECONDARYDIFFERENCEONLY = 0xffffff00;
+    static final int PRIMARYORDERSHIFT = 16;
+    static final int SECONDARYORDERSHIFT = 8;
 
     // ==============================================================
     // instance variables

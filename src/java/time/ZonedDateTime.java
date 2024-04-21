@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2015, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2007-2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -144,7 +144,7 @@ import java.util.Objects;
  * represents an instant, especially during a daylight savings overlap.
  *
  * <p>
- * This is a <a href="{@docRoot}/java/lang/doc-files/ValueBased.html">value-based</a>
+ * This is a <a href="{@docRoot}/java.base/java/lang/doc-files/ValueBased.html">value-based</a>
  * class; use of identity-sensitive operations (including reference equality
  * ({@code ==}), identity hash code, or synchronization) on instances of
  * {@code ZonedDateTime} may have unpredictable results and should be avoided.
@@ -470,6 +470,7 @@ public final class ZonedDateTime
      * @param offset  the zone offset, not null
      * @param zone  the time-zone, not null
      * @return the zoned date-time, not null
+     * @throws DateTimeException if the combination of arguments is invalid
      */
     public static ZonedDateTime ofStrict(LocalDateTime localDateTime, ZoneOffset offset, ZoneId zone) {
         Objects.requireNonNull(localDateTime, "localDateTime");
@@ -792,7 +793,7 @@ public final class ZonedDateTime
      * The {@link #isSupported(TemporalField) supported fields} will return valid
      * values based on this date-time, except {@code NANO_OF_DAY}, {@code MICRO_OF_DAY},
      * {@code EPOCH_DAY}, {@code PROLEPTIC_MONTH} and {@code INSTANT_SECONDS} which are too
-     * large to fit in an {@code int} and throw a {@code DateTimeException}.
+     * large to fit in an {@code int} and throw an {@code UnsupportedTemporalTypeException}.
      * All other {@code ChronoField} instances will throw an {@code UnsupportedTemporalTypeException}.
      * <p>
      * If the field is not a {@code ChronoField}, then the result of this method
@@ -1706,13 +1707,18 @@ public final class ZonedDateTime
      * Note that this is a different approach to that used by days, months and years,
      * thus adding one day is not the same as adding 24 hours.
      * <p>
-     * For example, consider a time-zone where the spring DST cutover means that the
-     * local times 01:00 to 01:59 occur twice changing from offset +02:00 to +01:00.
+     * For example, consider a time-zone, such as 'Europe/Paris', where the
+     * Autumn DST cutover means that the local times 02:00 to 02:59 occur twice
+     * changing from offset +02:00 in summer to +01:00 in winter.
      * <ul>
-     * <li>Adding one hour to 00:30+02:00 will result in 01:30+02:00
-     * <li>Adding one hour to 01:30+02:00 will result in 01:30+01:00
-     * <li>Adding one hour to 01:30+01:00 will result in 02:30+01:00
-     * <li>Adding three hours to 00:30+02:00 will result in 02:30+01:00
+     * <li>Adding one hour to 01:30+02:00 will result in 02:30+02:00
+     *     (both in summer time)
+     * <li>Adding one hour to 02:30+02:00 will result in 02:30+01:00
+     *     (moving from summer to winter time)
+     * <li>Adding one hour to 02:30+01:00 will result in 03:30+01:00
+     *     (both in winter time)
+     * <li>Adding three hours to 01:30+02:00 will result in 03:30+01:00
+     *     (moving from summer to winter time)
      * </ul>
      * <p>
      * This instance is immutable and unaffected by this method call.
@@ -1947,13 +1953,18 @@ public final class ZonedDateTime
      * Note that this is a different approach to that used by days, months and years,
      * thus subtracting one day is not the same as adding 24 hours.
      * <p>
-     * For example, consider a time-zone where the spring DST cutover means that the
-     * local times 01:00 to 01:59 occur twice changing from offset +02:00 to +01:00.
+     * For example, consider a time-zone, such as 'Europe/Paris', where the
+     * Autumn DST cutover means that the local times 02:00 to 02:59 occur twice
+     * changing from offset +02:00 in summer to +01:00 in winter.
      * <ul>
-     * <li>Subtracting one hour from 02:30+01:00 will result in 01:30+02:00
-     * <li>Subtracting one hour from 01:30+01:00 will result in 01:30+02:00
-     * <li>Subtracting one hour from 01:30+02:00 will result in 00:30+01:00
-     * <li>Subtracting three hours from 02:30+01:00 will result in 00:30+02:00
+     * <li>Subtracting one hour from 03:30+01:00 will result in 02:30+01:00
+     *     (both in winter time)
+     * <li>Subtracting one hour from 02:30+01:00 will result in 02:30+02:00
+     *     (moving from winter to summer time)
+     * <li>Subtracting one hour from 02:30+02:00 will result in 01:30+02:00
+     *     (both in summer time)
+     * <li>Subtracting three hours from 03:30+01:00 will result in 01:30+02:00
+     *     (moving from winter to summer time)
      * </ul>
      * <p>
      * This instance is immutable and unaffected by this method call.

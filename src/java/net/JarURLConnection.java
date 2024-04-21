@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -173,6 +173,14 @@ public abstract class JarURLConnection extends URLConnection {
         }
 
         jarFileURL = new URL(spec.substring(0, separator++));
+        /*
+         * The url argument may have had a runtime fragment appended, so
+         * we need to add a runtime fragment to the jarFileURL to enable
+         * runtime versioning when the underlying jar file is opened.
+         */
+        if ("runtime".equals(url.getRef())) {
+            jarFileURL = new URL(jarFileURL, "#runtime");
+        }
         entryName = null;
 
         /* if ! is the last letter of the innerURL, entryName is null */
@@ -246,7 +254,7 @@ public abstract class JarURLConnection extends URLConnection {
      * @see #getJarEntry
      */
     public JarEntry getJarEntry() throws IOException {
-        return getJarFile().getJarEntry(entryName);
+        return entryName == null ? null : getJarFile().getJarEntry(entryName);
     }
 
     /**

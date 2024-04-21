@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -54,7 +54,7 @@ import java.util.Date;
  * <b>Security permissions</b>
  * <p>
  * If a security manager is installed, and if a method is called which results in an
- * attempt to open a connection, the caller must possess either:-
+ * attempt to open a connection, the caller must possess either:
  * <ul><li>a "connect" {@link SocketPermission} to the host/port combination of the
  * destination URL or</li>
  * <li>a {@link URLPermission} that permits this request.</li>
@@ -64,9 +64,9 @@ import java.util.Date;
  * redirected host/URL.
  *
  * @see     java.net.HttpURLConnection#disconnect()
- * @since JDK1.1
+ * @since 1.1
  */
-abstract public class HttpURLConnection extends URLConnection {
+public abstract class HttpURLConnection extends URLConnection {
     /* instance variables */
 
     /**
@@ -101,6 +101,53 @@ abstract public class HttpURLConnection extends URLConnection {
      * @since 1.7
      */
     protected long fixedContentLengthLong = -1;
+
+    /**
+     * Supplies an {@link java.net.Authenticator Authenticator} to be used
+     * when authentication is requested through the HTTP protocol for
+     * this {@code HttpURLConnection}.
+     * If no authenticator is supplied, the
+     * {@linkplain Authenticator#setDefault(java.net.Authenticator) default
+     * authenticator} will be used.
+     *
+     * @implSpec The default behavior of this method is to unconditionally
+     *           throw {@link UnsupportedOperationException}. Concrete
+     *           implementations of {@code HttpURLConnection}
+     *           which support supplying an {@code Authenticator} for a
+     *           specific {@code HttpURLConnection} instance should
+     *           override this method to implement a different behavior.
+     *
+     * @implNote Depending on authentication schemes, an implementation
+     *           may or may not need to use the provided authenticator
+     *           to obtain a password. For instance, an implementation that
+     *           relies on third-party security libraries may still invoke the
+     *           default authenticator if these libraries are configured
+     *           to do so.
+     *           Likewise, an implementation that supports transparent
+     *           NTLM authentication may let the system attempt
+     *           to connect using the system user credentials first,
+     *           before invoking the provided authenticator.
+     *           <br>
+     *           However, if an authenticator is specifically provided,
+     *           then the underlying connection may only be reused for
+     *           {@code HttpURLConnection} instances which share the same
+     *           {@code Authenticator} instance, and authentication information,
+     *           if cached, may only be reused for an {@code HttpURLConnection}
+     *           sharing that same {@code Authenticator}.
+     *
+     * @param auth The {@code Authenticator} that should be used by this
+     *           {@code HttpURLConnection}.
+     *
+     * @throws  UnsupportedOperationException if setting an Authenticator is
+     *          not supported by the underlying implementation.
+     * @throws  IllegalStateException if URLConnection is already connected.
+     * @throws  NullPointerException if the supplied {@code auth} is {@code null}.
+     * @since 9
+     */
+    public void setAuthenticator(Authenticator auth) {
+        throw new UnsupportedOperationException("Supplying an authenticator"
+                    + " is not supported by " + this.getClass());
+    }
 
     /**
      * Returns the key for the {@code n}<sup>th</sup> header field.

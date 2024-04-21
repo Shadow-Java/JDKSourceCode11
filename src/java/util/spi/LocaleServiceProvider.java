@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2005, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2005, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util.spi;
@@ -43,9 +43,8 @@ import java.util.Locale;
  * supported by the Java runtime environment itself.
  *
  * <h3>Packaging of Locale Sensitive Service Provider Implementations</h3>
- * Implementations of these locale sensitive services are packaged using the
- * <a href="../../../../technotes/guides/extensions/index.html">Java Extension Mechanism</a>
- * as installed extensions.  A provider identifies itself with a
+ * Implementations of these locale sensitive services can be made available
+ * by adding them to the application's class path. A provider identifies itself with a
  * provider-configuration file in the resource directory META-INF/services,
  * using the fully qualified provider interface class name as the file name.
  * The file should contain a list of fully-qualified concrete provider class names,
@@ -113,39 +112,63 @@ import java.util.Locale;
  * provider returns null instead of a name, the lookup will proceed as
  * described above as if the locale was not supported.
  * <p>
- * Starting from JDK8, the search order of locale sensitive services can
+ * The search order of locale sensitive services can
  * be configured by using the "java.locale.providers" system property.
  * This system property declares the user's preferred order for looking up
  * the locale sensitive services separated by a comma. It is only read at
  * the Java runtime startup, so the later call to System.setProperty() won't
  * affect the order.
  * <p>
+ * Java Runtime Environment provides the following four locale providers:
+ * <ul>
+ * <li> "CLDR": A provider based on Unicode Consortium's
+ * <a href="http://cldr.unicode.org/">CLDR Project</a>.
+ * <li> "COMPAT": represents the locale sensitive services that is compatible
+ * with the prior JDK releases up to JDK8 (same as JDK8's "JRE").
+ * <li> "SPI": represents the locale sensitive services implementing the subclasses of
+ * this {@code LocaleServiceProvider} class.
+ * <li> "HOST": A provider that reflects the user's custom settings in the
+ * underlying operating system. This provider may not be available, depending
+ * on the Java Runtime Environment implementation.
+ * <li> "JRE": represents a synonym to "COMPAT". This name
+ * is deprecated and will be removed in the future release of JDK.
+ * </ul>
+ * <p>
  * For example, if the following is specified in the property:
  * <pre>
- * java.locale.providers=SPI,JRE
+ * java.locale.providers=SPI,CLDR,COMPAT
  * </pre>
- * where "SPI" represents the locale sensitive services implemented in the
- * installed SPI providers, and "JRE" represents the locale sensitive services
- * in the Java Runtime Environment, the locale sensitive services in the SPI
- * providers are looked up first.
+ * the locale sensitive services in the SPI providers are looked up first. If the
+ * desired locale sensitive service is not available, then the runtime looks for CLDR,
+ * COMPAT in that order.
  * <p>
- * There are two other possible locale sensitive service providers, i.e., "CLDR"
- * which is a provider based on Unicode Consortium's
- * <a href="http://cldr.unicode.org/">CLDR Project</a>, and "HOST" which is a
- * provider that reflects the user's custom settings in the underlying operating
- * system. These two providers may not be available, depending on the Java Runtime
- * Environment implementation. Specifying "JRE,SPI" is identical to the default
- * behavior, which is compatibile with the prior releases.
+ * The default order for looking up the preferred locale providers is "CLDR,COMPAT",
+ * so specifying "CLDR,COMPAT" is identical to the default behavior. Applications which
+ * require implementations of the locale sensitive services must explicitly specify
+ * "SPI" in order for the Java runtime to load them from the classpath.
  *
  * @since        1.6
  */
 public abstract class LocaleServiceProvider {
 
+    private static Void checkPermission() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new RuntimePermission("localeServiceProvider"));
+        }
+        return null;
+    }
+    private LocaleServiceProvider(Void ignore) { }
+
     /**
-     * Sole constructor.  (For invocation by subclass constructors, typically
-     * implicit.)
+     * Initializes a new locale service provider.
+     *
+     * @throws  SecurityException
+     *          If a security manager has been installed and it denies
+     *          {@link RuntimePermission RuntimePermission("localeServiceProvider")}
      */
     protected LocaleServiceProvider() {
+        this(checkPermission());
     }
 
     /**

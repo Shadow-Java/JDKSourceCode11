@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2009-2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -77,6 +77,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Collections;
 
 /**
  * Provider of time-zone rules to the system.
@@ -118,7 +119,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Providers must ensure that once a rule has been seen by the application, the
  * rule must continue to be available.
  * <p>
-*  Providers are encouraged to implement a meaningful {@code toString} method.
+ * Providers are encouraged to implement a meaningful {@code toString} method.
  * <p>
  * Many systems would like to update time-zone rules dynamically without stopping the JVM.
  * When examined in detail, this is a complex problem.
@@ -137,16 +138,22 @@ public abstract class ZoneRulesProvider {
      */
     private static final ConcurrentMap<String, ZoneRulesProvider> ZONES = new ConcurrentHashMap<>(512, 0.75f, 2);
 
+    /**
+     * The zone ID data
+     */
+    private static volatile Set<String> ZONE_IDS;
+
     static {
         // if the property java.time.zone.DefaultZoneRulesProvider is
         // set then its value is the class name of the default provider
         final List<ZoneRulesProvider> loaded = new ArrayList<>();
-        AccessController.doPrivileged(new PrivilegedAction<Object>() {
+        AccessController.doPrivileged(new PrivilegedAction<>() {
             public Object run() {
                 String prop = System.getProperty("java.time.zone.DefaultZoneRulesProvider");
                 if (prop != null) {
                     try {
                         Class<?> c = Class.forName(prop, true, ClassLoader.getSystemClassLoader());
+                        @SuppressWarnings("deprecation")
                         ZoneRulesProvider provider = ZoneRulesProvider.class.cast(c.newInstance());
                         registerProvider(provider);
                         loaded.add(provider);
@@ -193,10 +200,10 @@ public abstract class ZoneRulesProvider {
      * <p>
      * These IDs are the string form of a {@link ZoneId}.
      *
-     * @return a modifiable copy of the set of zone IDs, not null
+     * @return the unmodifiable set of zone IDs, not null
      */
     public static Set<String> getAvailableZoneIds() {
-        return new HashSet<>(ZONES.keySet());
+        return ZONE_IDS;
     }
 
     /**
@@ -302,7 +309,7 @@ public abstract class ZoneRulesProvider {
      * @param provider  the provider to register, not null
      * @throws ZoneRulesException if unable to complete the registration
      */
-    private static void registerProvider0(ZoneRulesProvider provider) {
+    private static synchronized void registerProvider0(ZoneRulesProvider provider) {
         for (String zoneId : provider.provideZoneIds()) {
             Objects.requireNonNull(zoneId, "zoneId");
             ZoneRulesProvider old = ZONES.putIfAbsent(zoneId, provider);
@@ -312,6 +319,8 @@ public abstract class ZoneRulesProvider {
                     ", currently loading from provider: " + provider);
             }
         }
+        Set<String> combinedSet = new HashSet<String>(ZONES.keySet());
+        ZONE_IDS = Collections.unmodifiableSet(combinedSet);
     }
 
     /**

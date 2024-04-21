@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -30,12 +30,14 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
-import sun.misc.JavaSecurityAccess;
-import sun.misc.JavaSecurityProtectionDomainAccess;
-import static sun.misc.JavaSecurityProtectionDomainAccess.ProtectionDomainCache;
-import sun.misc.SharedSecrets;
+import jdk.internal.misc.JavaSecurityAccess;
+import jdk.internal.misc.SharedSecrets;
+import sun.security.action.GetPropertyAction;
+import sun.security.provider.PolicyFile;
 import sun.security.util.Debug;
+import sun.security.util.FilePermCompat;
 import sun.security.util.SecurityConstants;
 
 /**
@@ -49,14 +51,23 @@ import sun.security.util.SecurityConstants;
  * ProtectionDomain can also be constructed such that it is dynamically
  * mapped to a set of permissions by the current Policy whenever a permission
  * is checked.
- * <p>
  *
  * @author Li Gong
  * @author Roland Schemers
  * @author Gary Ellison
+ * @since 1.2
  */
 
 public class ProtectionDomain {
+
+    /**
+     * If true, {@link #impliesWithAltFilePerm} will try to be compatible on
+     * FilePermission checking even if a 3rd-party Policy implementation is set.
+     */
+    private static final boolean filePermCompatInPD =
+            "true".equals(GetPropertyAction.privilegedGetProperty(
+                "jdk.security.filePermCompat"));
+
     private static class JavaSecurityAccessImpl implements JavaSecurityAccess {
 
         private JavaSecurityAccessImpl() {
@@ -85,10 +96,32 @@ public class ProtectionDomain {
                 AccessController.getContext(), context);
         }
 
-        private static AccessControlContext getCombinedACC(AccessControlContext context, AccessControlContext stack) {
-            AccessControlContext acc = new AccessControlContext(context, stack.getCombiner(), true);
+        @Override
+        public ProtectionDomain[] getProtectDomains(AccessControlContext context) {
+            return context.getContext();
+        }
+
+        private static AccessControlContext getCombinedACC(
+            AccessControlContext context, AccessControlContext stack) {
+            AccessControlContext acc =
+                new AccessControlContext(context, stack.getCombiner(), true);
 
             return new AccessControlContext(stack.getContext(), acc).optimize();
+        }
+
+        @Override
+        public ProtectionDomainCache getProtectionDomainCache() {
+            return new ProtectionDomainCache() {
+                private final Map<Key, PermissionCollection> map =
+                        Collections.synchronizedMap(new WeakHashMap<>());
+                public void put(ProtectionDomain pd,
+                                PermissionCollection pc) {
+                    map.put((pd == null ? null : pd.key), pc);
+                }
+                public PermissionCollection get(ProtectionDomain pd) {
+                    return pd == null ? map.get(null) : map.get(pd.key);
+                }
+            };
         }
     }
 
@@ -114,21 +147,23 @@ public class ProtectionDomain {
 
     /* the PermissionCollection is static (pre 1.4 constructor)
        or dynamic (via a policy refresh) */
-    private boolean staticPermissions;
+    private final boolean staticPermissions;
 
     /*
      * An object used as a key when the ProtectionDomain is stored in a Map.
      */
     final Key key = new Key();
 
-    private static final Debug debug = Debug.getInstance("domain");
-
     /**
      * Creates a new ProtectionDomain with the given CodeSource and
      * Permissions. If the permissions object is not null, then
-     *  {@code setReadOnly())} will be called on the passed in
-     * Permissions object. The only permissions granted to this domain
-     * are the ones specified; the current Policy will not be consulted.
+     *  {@code setReadOnly()} will be called on the passed in
+     * Permissions object.
+     * <p>
+     * The permissions granted to this domain are static, i.e.
+     * invoking the {@link #staticPermissionsOnly()} method returns true.
+     * They contain only the ones passed to this constructor and
+     * the current Policy will not be consulted.
      *
      * @param codesource the codesource associated with this domain
      * @param permissions the permissions granted to this domain
@@ -154,9 +189,11 @@ public class ProtectionDomain {
      * Permissions, ClassLoader and array of Principals. If the
      * permissions object is not null, then {@code setReadOnly()}
      * will be called on the passed in Permissions object.
-     * The permissions granted to this domain are dynamic; they include
-     * both the static permissions passed to this constructor, and any
-     * permissions granted to this domain by the current Policy at the
+     * <p>
+     * The permissions granted to this domain are dynamic, i.e.
+     * invoking the {@link #staticPermissionsOnly()} method returns false.
+     * They include both the static permissions passed to this constructor,
+     * and any permissions granted to this domain by the current Policy at the
      * time a permission is checked.
      * <p>
      * This constructor is typically used by
@@ -166,7 +203,6 @@ public class ProtectionDomain {
      * this domain. This constructor affords the
      * Policy provider the opportunity to augment the supplied
      * PermissionCollection to reflect policy changes.
-     * <p>
      *
      * @param codesource the CodeSource associated with this domain
      * @param permissions the permissions granted to this domain
@@ -241,6 +277,19 @@ public class ProtectionDomain {
     }
 
     /**
+     * Returns true if this domain contains only static permissions
+     * and does not check the current {@code Policy} at the time of
+     * permission checking.
+     *
+     * @return true if this domain contains only static permissions.
+     *
+     * @since 9
+     */
+    public final boolean staticPermissionsOnly() {
+        return this.staticPermissions;
+    }
+
+    /**
      * Check and see if this ProtectionDomain implies the permissions
      * expressed in the Permission object.
      * <p>
@@ -248,26 +297,19 @@ public class ProtectionDomain {
      * ProtectionDomain was constructed with a static set of permissions
      * or it was bound to a dynamically mapped set of permissions.
      * <p>
-     * If the ProtectionDomain was constructed to a
-     * {@link #ProtectionDomain(CodeSource, PermissionCollection)
-     * statically bound} PermissionCollection then the permission will
-     * only be checked against the PermissionCollection supplied at
-     * construction.
+     * If the {@link #staticPermissionsOnly()} method returns
+     * true, then the permission will only be checked against the
+     * PermissionCollection supplied at construction.
      * <p>
-     * However, if the ProtectionDomain was constructed with
-     * the constructor variant which supports
-     * {@link #ProtectionDomain(CodeSource, PermissionCollection,
-     * ClassLoader, java.security.Principal[]) dynamically binding}
-     * permissions, then the permission will be checked against the
-     * combination of the PermissionCollection supplied at construction and
+     * Otherwise, the permission will be checked against the combination
+     * of the PermissionCollection supplied at construction and
      * the current Policy binding.
-     * <p>
      *
-     * @param permission the Permission object to check.
+     * @param perm the Permission object to check.
      *
-     * @return true if "permission" is implicit to this ProtectionDomain.
+     * @return true if {@code perm} is implied by this ProtectionDomain.
      */
-    public boolean implies(Permission permission) {
+    public boolean implies(Permission perm) {
 
         if (hasAllPerm) {
             // internal permission collection already has AllPermission -
@@ -276,11 +318,79 @@ public class ProtectionDomain {
         }
 
         if (!staticPermissions &&
-            Policy.getPolicyNoCheck().implies(this, permission))
+            Policy.getPolicyNoCheck().implies(this, perm)) {
             return true;
-        if (permissions != null)
-            return permissions.implies(permission);
+        }
+        if (permissions != null) {
+            return permissions.implies(perm);
+        }
 
+        return false;
+    }
+
+    /**
+     * This method has almost the same logic flow as {@link #implies} but
+     * it ensures some level of FilePermission compatibility after JDK-8164705.
+     *
+     * This method is called by {@link AccessControlContext#checkPermission}
+     * and not intended to be called by an application.
+     */
+    boolean impliesWithAltFilePerm(Permission perm) {
+
+        // If FilePermCompat.compat is set (default value), FilePermission
+        // checking compatibility should be considered.
+
+        // If filePermCompatInPD is set, this method checks for alternative
+        // FilePermission to keep compatibility for any Policy implementation.
+        // When set to false (default value), implies() is called since
+        // the PolicyFile implementation already supports compatibility.
+
+        // If this is a subclass of ProtectionDomain, call implies()
+        // because most likely user has overridden it.
+
+        if (!filePermCompatInPD || !FilePermCompat.compat ||
+                getClass() != ProtectionDomain.class) {
+            return implies(perm);
+        }
+
+        if (hasAllPerm) {
+            // internal permission collection already has AllPermission -
+            // no need to go to policy
+            return true;
+        }
+
+        Permission p2 = null;
+        boolean p2Calculated = false;
+
+        if (!staticPermissions) {
+            Policy policy = Policy.getPolicyNoCheck();
+            if (policy instanceof PolicyFile) {
+                // The PolicyFile implementation supports compatibility
+                // inside and it also covers the static permissions.
+                return policy.implies(this, perm);
+            } else {
+                if (policy.implies(this, perm)) {
+                    return true;
+                }
+                p2 = FilePermCompat.newPermUsingAltPath(perm);
+                p2Calculated = true;
+                if (p2 != null && policy.implies(this, p2)) {
+                    return true;
+                }
+            }
+        }
+        if (permissions != null) {
+            if (permissions.implies(perm)) {
+                return true;
+            } else {
+                if (!p2Calculated) {
+                    p2 = FilePermCompat.newPermUsingAltPath(perm);
+                }
+                if (p2 != null) {
+                    return permissions.implies(p2);
+                }
+            }
+        }
         return false;
     }
 
@@ -322,6 +432,13 @@ public class ProtectionDomain {
             " "+pc+"\n";
     }
 
+    /*
+     * holder class for the static field "debug" to delay its initialization
+     */
+    private static class DebugHolder {
+        private static final Debug debug = Debug.getInstance("domain");
+    }
+
     /**
      * Return true (merge policy permissions) in the following cases:
      *
@@ -343,7 +460,7 @@ public class ProtectionDomain {
         if (sm == null) {
             return true;
         } else {
-            if (debug != null) {
+            if (DebugHolder.debug != null) {
                 if (sm.getClass().getClassLoader() == null &&
                     Policy.getPolicyNoCheck().getClass().getClassLoader()
                                                                 == null) {
@@ -368,7 +485,7 @@ public class ProtectionDomain {
 
         PermissionCollection perms =
             java.security.AccessController.doPrivileged
-            (new java.security.PrivilegedAction<PermissionCollection>() {
+            (new java.security.PrivilegedAction<>() {
                     public PermissionCollection run() {
                         Policy p = Policy.getPolicyNoCheck();
                         return p.getPermissions(ProtectionDomain.this);
@@ -424,7 +541,7 @@ public class ProtectionDomain {
                             // have some side effects so this manual
                             // comparison is sufficient.
                             if (pdpName.equals(pp.getName()) &&
-                                pdpActions.equals(pp.getActions())) {
+                                Objects.equals(pdpActions, pp.getActions())) {
                                 plVector.remove(i);
                                 break;
                             }
@@ -456,29 +573,4 @@ public class ProtectionDomain {
      */
     final class Key {}
 
-    static {
-        SharedSecrets.setJavaSecurityProtectionDomainAccess(
-            new JavaSecurityProtectionDomainAccess() {
-                @Override
-                public ProtectionDomainCache getProtectionDomainCache() {
-                    return new ProtectionDomainCache() {
-                        private final Map<Key, PermissionCollection> map =
-                            Collections.synchronizedMap
-                                (new WeakHashMap<Key, PermissionCollection>());
-                        public void put(ProtectionDomain pd,
-                            PermissionCollection pc) {
-                            map.put((pd == null ? null : pd.key), pc);
-                        }
-                        public PermissionCollection get(ProtectionDomain pd) {
-                            return pd == null ? map.get(null) : map.get(pd.key);
-                        }
-                    };
-                }
-
-                @Override
-                public boolean getStaticPermissionsField(ProtectionDomain pd) {
-                    return pd.staticPermissions;
-                }
-            });
-    }
 }

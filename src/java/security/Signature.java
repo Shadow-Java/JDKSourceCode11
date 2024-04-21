@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -37,10 +37,11 @@ import java.nio.ByteBuffer;
 import java.security.Provider.Service;
 
 import javax.crypto.Cipher;
-import javax.crypto.CipherSpi;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.BadPaddingException;
 import javax.crypto.NoSuchPaddingException;
+import jdk.internal.misc.JavaSecuritySignatureAccess;
+import jdk.internal.misc.SharedSecrets;
 
 import sun.security.util.Debug;
 import sun.security.jca.*;
@@ -101,21 +102,51 @@ import sun.security.jca.GetInstance.Instance;
  * following standard {@code Signature} algorithms:
  * <ul>
  * <li>{@code SHA1withDSA}</li>
+ * <li>{@code SHA256withDSA}</li>
  * <li>{@code SHA1withRSA}</li>
  * <li>{@code SHA256withRSA}</li>
  * </ul>
  * These algorithms are described in the <a href=
- * "{@docRoot}/../technotes/guides/security/StandardNames.html#Signature">
+ * "{@docRoot}/../specs/security/standard-names.html#signature-algorithms">
  * Signature section</a> of the
- * Java Cryptography Architecture Standard Algorithm Name Documentation.
+ * Java Security Standard Algorithm Names Specification.
  * Consult the release documentation for your implementation to see if any
  * other algorithms are supported.
  *
  * @author Benjamin Renaud
+ * @since 1.1
  *
  */
 
 public abstract class Signature extends SignatureSpi {
+
+    static {
+        SharedSecrets.setJavaSecuritySignatureAccess(
+            new JavaSecuritySignatureAccess() {
+                @Override
+                public void initVerify(Signature s, PublicKey publicKey,
+                        AlgorithmParameterSpec params)
+                        throws InvalidKeyException,
+                        InvalidAlgorithmParameterException {
+                    s.initVerify(publicKey, params);
+                }
+                @Override
+                public void initVerify(Signature s,
+                        java.security.cert.Certificate certificate,
+                        AlgorithmParameterSpec params)
+                        throws InvalidKeyException,
+                        InvalidAlgorithmParameterException {
+                    s.initVerify(certificate, params);
+                }
+                @Override
+                public void initSign(Signature s, PrivateKey privateKey,
+                        AlgorithmParameterSpec params, SecureRandom random)
+                        throws InvalidKeyException,
+                        InvalidAlgorithmParameterException {
+                    s.initSign(privateKey, params, random);
+                }
+        });
+    }
 
     private static final Debug debug =
                         Debug.getInstance("jca", "Signature");
@@ -139,19 +170,19 @@ public abstract class Signature extends SignatureSpi {
      * Possible {@link #state} value, signifying that
      * this signature object has not yet been initialized.
      */
-    protected final static int UNINITIALIZED = 0;
+    protected static final int UNINITIALIZED = 0;
 
     /**
      * Possible {@link #state} value, signifying that
      * this signature object has been initialized for signing.
      */
-    protected final static int SIGN = 2;
+    protected static final int SIGN = 2;
 
     /**
      * Possible {@link #state} value, signifying that
      * this signature object has been initialized for verification.
      */
-    protected final static int VERIFY = 3;
+    protected static final int VERIFY = 3;
 
     /**
      * Current state of this signature object.
@@ -163,8 +194,8 @@ public abstract class Signature extends SignatureSpi {
      *
      * @param algorithm the standard string name of the algorithm.
      * See the Signature section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#Signature">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#signature-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      */
     protected Signature(String algorithm) {
@@ -172,21 +203,18 @@ public abstract class Signature extends SignatureSpi {
     }
 
     // name of the special signature alg
-    private final static String RSA_SIGNATURE = "NONEwithRSA";
+    private static final String RSA_SIGNATURE = "NONEwithRSA";
 
     // name of the equivalent cipher alg
-    private final static String RSA_CIPHER = "RSA/ECB/PKCS1Padding";
+    private static final String RSA_CIPHER = "RSA/ECB/PKCS1Padding";
 
     // all the services we need to lookup for compatibility with Cipher
-    private final static List<ServiceId> rsaIds = Arrays.asList(
-        new ServiceId[] {
-            new ServiceId("Signature", "NONEwithRSA"),
-            new ServiceId("Cipher", "RSA/ECB/PKCS1Padding"),
-            new ServiceId("Cipher", "RSA/ECB"),
-            new ServiceId("Cipher", "RSA//PKCS1Padding"),
-            new ServiceId("Cipher", "RSA"),
-        }
-    );
+    private static final List<ServiceId> rsaIds = List.of(
+        new ServiceId("Signature", "NONEwithRSA"),
+        new ServiceId("Cipher", "RSA/ECB/PKCS1Padding"),
+        new ServiceId("Cipher", "RSA/ECB"),
+        new ServiceId("Cipher", "RSA//PKCS1Padding"),
+        new ServiceId("Cipher", "RSA"));
 
     /**
      * Returns a Signature object that implements the specified signature
@@ -201,22 +229,33 @@ public abstract class Signature extends SignatureSpi {
      * <p> Note that the list of registered providers may be retrieved via
      * the {@link Security#getProviders() Security.getProviders()} method.
      *
+     * @implNote
+     * The JDK Reference Implementation additionally uses the
+     * {@code jdk.security.provider.preferred}
+     * {@link Security#getProperty(String) Security} property to determine
+     * the preferred provider order for the specified algorithm. This
+     * may be different than the order of providers returned by
+     * {@link Security#getProviders() Security.getProviders()}.
+     *
      * @param algorithm the standard name of the algorithm requested.
      * See the Signature section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#Signature">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#signature-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
-     * @return the new Signature object.
+     * @return the new {@code Signature} object
      *
-     * @exception NoSuchAlgorithmException if no Provider supports a
-     *          Signature implementation for the
-     *          specified algorithm.
+     * @throws NoSuchAlgorithmException if no {@code Provider} supports a
+     *         {@code Signature} implementation for the
+     *         specified algorithm
+     *
+     * @throws NullPointerException if {@code algorithm} is {@code null}
      *
      * @see Provider
      */
     public static Signature getInstance(String algorithm)
             throws NoSuchAlgorithmException {
+        Objects.requireNonNull(algorithm, "null algorithm name");
         List<Service> list;
         if (algorithm.equalsIgnoreCase(RSA_SIGNATURE)) {
             list = GetInstance.getServices(rsaIds);
@@ -261,10 +300,10 @@ public abstract class Signature extends SignatureSpi {
         return sig;
     }
 
-    private final static Map<String,Boolean> signatureInfo;
+    private static final Map<String,Boolean> signatureInfo;
 
     static {
-        signatureInfo = new ConcurrentHashMap<String,Boolean>();
+        signatureInfo = new ConcurrentHashMap<>();
         Boolean TRUE = Boolean.TRUE;
         // pre-initialize with values for our SignatureSpi implementations
         signatureInfo.put("sun.security.provider.DSA$RawDSA", TRUE);
@@ -275,6 +314,7 @@ public abstract class Signature extends SignatureSpi {
         signatureInfo.put("sun.security.rsa.RSASignature$SHA256withRSA", TRUE);
         signatureInfo.put("sun.security.rsa.RSASignature$SHA384withRSA", TRUE);
         signatureInfo.put("sun.security.rsa.RSASignature$SHA512withRSA", TRUE);
+        signatureInfo.put("sun.security.rsa.RSAPSSSignature", TRUE);
         signatureInfo.put("com.sun.net.ssl.internal.ssl.RSASignature", TRUE);
         signatureInfo.put("sun.security.pkcs11.P11Signature", TRUE);
     }
@@ -323,31 +363,34 @@ public abstract class Signature extends SignatureSpi {
      *
      * @param algorithm the name of the algorithm requested.
      * See the Signature section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#Signature">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#signature-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
      * @param provider the name of the provider.
      *
-     * @return the new Signature object.
+     * @return the new {@code Signature} object
      *
-     * @exception NoSuchAlgorithmException if a SignatureSpi
-     *          implementation for the specified algorithm is not
-     *          available from the specified provider.
+     * @throws IllegalArgumentException if the provider name is {@code null}
+     *         or empty
      *
-     * @exception NoSuchProviderException if the specified provider is not
-     *          registered in the security provider list.
+     * @throws NoSuchAlgorithmException if a {@code SignatureSpi}
+     *         implementation for the specified algorithm is not
+     *         available from the specified provider
      *
-     * @exception IllegalArgumentException if the provider name is null
-     *          or empty.
+     * @throws NoSuchProviderException if the specified provider is not
+     *         registered in the security provider list
+     *
+     * @throws NullPointerException if {@code algorithm} is {@code null}
      *
      * @see Provider
      */
     public static Signature getInstance(String algorithm, String provider)
             throws NoSuchAlgorithmException, NoSuchProviderException {
+        Objects.requireNonNull(algorithm, "null algorithm name");
         if (algorithm.equalsIgnoreCase(RSA_SIGNATURE)) {
             // exception compatibility with existing code
-            if ((provider == null) || (provider.length() == 0)) {
+            if (provider == null || provider.isEmpty()) {
                 throw new IllegalArgumentException("missing provider");
             }
             Provider p = Security.getProvider(provider);
@@ -373,19 +416,21 @@ public abstract class Signature extends SignatureSpi {
      *
      * @param algorithm the name of the algorithm requested.
      * See the Signature section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#Signature">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#signature-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
      * @param provider the provider.
      *
-     * @return the new Signature object.
+     * @return the new {@code Signature} object
      *
-     * @exception NoSuchAlgorithmException if a SignatureSpi
-     *          implementation for the specified algorithm is not available
-     *          from the specified Provider object.
+     * @throws IllegalArgumentException if the provider is {@code null}
      *
-     * @exception IllegalArgumentException if the provider is null.
+     * @throws NoSuchAlgorithmException if a {@code SignatureSpi}
+     *         implementation for the specified algorithm is not available
+     *         from the specified {@code Provider} object
+     *
+     * @throws NullPointerException if {@code algorithm} is {@code null}
      *
      * @see Provider
      *
@@ -393,6 +438,7 @@ public abstract class Signature extends SignatureSpi {
      */
     public static Signature getInstance(String algorithm, Provider provider)
             throws NoSuchAlgorithmException {
+        Objects.requireNonNull(algorithm, "null algorithm name");
         if (algorithm.equalsIgnoreCase(RSA_SIGNATURE)) {
             // exception compatibility with existing code
             if (provider == null) {
@@ -467,6 +513,53 @@ public abstract class Signature extends SignatureSpi {
     }
 
     /**
+     * Initialize this object for verification. If this method is called
+     * again with different arguments, it negates the effect
+     * of this call.
+     *
+     * @param publicKey the public key of the identity whose signature is
+     * going to be verified.
+     * @param params the parameters used for verifying this signature.
+     *
+     * @exception InvalidKeyException if the key is invalid.
+     * @exception InvalidAlgorithmParameterException if the params is invalid.
+     */
+    final void initVerify(PublicKey publicKey, AlgorithmParameterSpec params)
+            throws InvalidKeyException, InvalidAlgorithmParameterException {
+        engineInitVerify(publicKey, params);
+        state = VERIFY;
+
+        if (!skipDebug && pdebug != null) {
+            pdebug.println("Signature." + algorithm +
+                " verification algorithm from: " + getProviderName());
+        }
+    }
+
+    private static PublicKey getPublicKeyFromCert(Certificate cert)
+            throws InvalidKeyException {
+        // If the certificate is of type X509Certificate,
+        // we should check whether it has a Key Usage
+        // extension marked as critical.
+        //if (cert instanceof java.security.cert.X509Certificate) {
+        if (cert instanceof X509Certificate) {
+            // Check whether the cert has a key usage extension
+            // marked as a critical extension.
+            // The OID for KeyUsage extension is 2.5.29.15.
+            X509Certificate c = (X509Certificate)cert;
+            Set<String> critSet = c.getCriticalExtensionOIDs();
+
+            if (critSet != null && !critSet.isEmpty()
+                && critSet.contains("2.5.29.15")) {
+                boolean[] keyUsageInfo = c.getKeyUsage();
+                // keyUsageInfo[0] is for digitalSignature.
+                if ((keyUsageInfo != null) && (keyUsageInfo[0] == false))
+                    throw new InvalidKeyException("Wrong key usage");
+            }
+        }
+        return cert.getPublicKey();
+    }
+
+    /**
      * Initializes this object for verification, using the public key from
      * the given certificate.
      * <p>If the certificate is of type X.509 and has a <i>key usage</i>
@@ -486,27 +579,40 @@ public abstract class Signature extends SignatureSpi {
      */
     public final void initVerify(Certificate certificate)
             throws InvalidKeyException {
-        // If the certificate is of type X509Certificate,
-        // we should check whether it has a Key Usage
-        // extension marked as critical.
-        if (certificate instanceof java.security.cert.X509Certificate) {
-            // Check whether the cert has a key usage extension
-            // marked as a critical extension.
-            // The OID for KeyUsage extension is 2.5.29.15.
-            X509Certificate cert = (X509Certificate)certificate;
-            Set<String> critSet = cert.getCriticalExtensionOIDs();
+        engineInitVerify(getPublicKeyFromCert(certificate));
+        state = VERIFY;
 
-            if (critSet != null && !critSet.isEmpty()
-                && critSet.contains("2.5.29.15")) {
-                boolean[] keyUsageInfo = cert.getKeyUsage();
-                // keyUsageInfo[0] is for digitalSignature.
-                if ((keyUsageInfo != null) && (keyUsageInfo[0] == false))
-                    throw new InvalidKeyException("Wrong key usage");
-            }
+        if (!skipDebug && pdebug != null) {
+            pdebug.println("Signature." + algorithm +
+                " verification algorithm from: " + getProviderName());
         }
+    }
 
-        PublicKey publicKey = certificate.getPublicKey();
-        engineInitVerify(publicKey);
+    /**
+     * Initializes this object for verification, using the public key from
+     * the given certificate.
+     * <p>If the certificate is of type X.509 and has a <i>key usage</i>
+     * extension field marked as critical, and the value of the <i>key usage</i>
+     * extension field implies that the public key in
+     * the certificate and its corresponding private key are not
+     * supposed to be used for digital signatures, an
+     * {@code InvalidKeyException} is thrown.
+     *
+     * @param certificate the certificate of the identity whose signature is
+     * going to be verified.
+     * @param params the parameters used for verifying this signature.
+     *
+     * @exception InvalidKeyException  if the public key in the certificate
+     * is not encoded properly or does not include required  parameter
+     * information or cannot be used for digital signature purposes.
+     * @exception InvalidAlgorithmParameterException if the params is invalid.
+     *
+     * @since 13
+     */
+    final void initVerify(Certificate certificate,
+            AlgorithmParameterSpec params)
+            throws InvalidKeyException, InvalidAlgorithmParameterException {
+        engineInitVerify(getPublicKeyFromCert(certificate), params);
         state = VERIFY;
 
         if (!skipDebug && pdebug != null) {
@@ -551,6 +657,31 @@ public abstract class Signature extends SignatureSpi {
     public final void initSign(PrivateKey privateKey, SecureRandom random)
             throws InvalidKeyException {
         engineInitSign(privateKey, random);
+        state = SIGN;
+
+        if (!skipDebug && pdebug != null) {
+            pdebug.println("Signature." + algorithm +
+                " signing algorithm from: " + getProviderName());
+        }
+    }
+
+    /**
+     * Initialize this object for signing. If this method is called
+     * again with different arguments, it negates the effect
+     * of this call.
+     *
+     * @param privateKey the private key of the identity whose signature
+     * is going to be generated.
+     * @param params the parameters used for generating signature.
+     * @param random the source of randomness for this signature.
+     *
+     * @exception InvalidKeyException if the key is invalid.
+     * @exception InvalidAlgorithmParameterException if the params is invalid
+     */
+    final void initSign(PrivateKey privateKey,
+            AlgorithmParameterSpec params, SecureRandom random)
+            throws InvalidKeyException, InvalidAlgorithmParameterException {
+        engineInitSign(privateKey, params, random);
         state = SIGN;
 
         if (!skipDebug && pdebug != null) {
@@ -607,9 +738,13 @@ public abstract class Signature extends SignatureSpi {
      * @return the number of bytes placed into {@code outbuf}.
      *
      * @exception SignatureException if this signature object is not
-     * initialized properly, if this signature algorithm is unable to
-     * process the input data provided, or if {@code len} is less
-     * than the actual signature length.
+     *     initialized properly, if this signature algorithm is unable to
+     *     process the input data provided, or if {@code len} is less
+     *     than the actual signature length.
+     * @exception IllegalArgumentException if {@code outbuf} is {@code null},
+     *     or {@code offset} or {@code len} is less than 0, or the sum of
+     *     {@code offset} and {@code len} is greater than the length of
+     *     {@code outbuf}.
      *
      * @since 1.2
      */
@@ -680,7 +815,7 @@ public abstract class Signature extends SignatureSpi {
      * encoded or of the wrong type, if this signature algorithm is unable to
      * process the input data provided, etc.
      * @exception IllegalArgumentException if the {@code signature}
-     * byte array is null, or the {@code offset} or {@code length}
+     * byte array is {@code null}, or the {@code offset} or {@code length}
      * is less than 0, or the sum of the {@code offset} and
      * {@code length} is greater than the length of the
      * {@code signature} byte array.
@@ -746,7 +881,11 @@ public abstract class Signature extends SignatureSpi {
      * @param len the number of bytes to use, starting at offset.
      *
      * @exception SignatureException if this signature object is not
-     * initialized properly.
+     *     initialized properly.
+     * @exception IllegalArgumentException if {@code data} is {@code null},
+     *     or {@code off} or {@code len} is less than 0, or the sum of
+     *     {@code off} and {@code len} is greater than the length of
+     *     {@code data}.
      */
     public final void update(byte[] data, int off, int len)
             throws SignatureException {
@@ -771,7 +910,7 @@ public abstract class Signature extends SignatureSpi {
     /**
      * Updates the data to be signed or verified using the specified
      * ByteBuffer. Processes the {@code data.remaining()} bytes
-     * starting at at {@code data.position()}.
+     * starting at {@code data.position()}.
      * Upon return, the buffer's position will be equal to its limit;
      * its limit will not have changed.
      *
@@ -873,14 +1012,15 @@ public abstract class Signature extends SignatureSpi {
     /**
      * Returns the parameters used with this signature object.
      *
-     * <p>The returned parameters may be the same that were used to initialize
-     * this signature, or may contain a combination of default and randomly
-     * generated parameter values used by the underlying signature
-     * implementation if this signature requires algorithm parameters but
-     * was not initialized with any.
+     * <p> If this signature has been previously initialized with parameters
+     * (by calling the {@code setParameter} method), this method returns
+     * the same parameters. If this signature has not been initialized with
+     * parameters, this method may return a combination of default and
+     * randomly generated parameter values if the underlying
+     * signature implementation supports it and can successfully generate
+     * them. Otherwise, {@code null} is returned.
      *
-     * @return the parameters used with this signature, or null if this
-     * signature does not use any parameters.
+     * @return the parameters used with this signature, or {@code null}
      *
      * @see #setParameter(AlgorithmParameterSpec)
      * @since 1.4
@@ -901,7 +1041,7 @@ public abstract class Signature extends SignatureSpi {
      *
      * @param param the string name of the parameter.
      *
-     * @return the object that represents the parameter value, or null if
+     * @return the object that represents the parameter value, or {@code null} if
      * there is none.
      *
      * @exception InvalidParameterException if {@code param} is an invalid
@@ -1086,11 +1226,13 @@ public abstract class Signature extends SignatureSpi {
             }
         }
 
-        private void chooseProvider(int type, Key key, SecureRandom random)
-                throws InvalidKeyException {
+        // Used by engineSetParameter/engineInitSign/engineInitVerify() to
+        // find the right provider with the supplied key, parameters, random source
+        private void chooseProvider(int type, Key key,
+                AlgorithmParameterSpec params, SecureRandom random)
+                throws InvalidKeyException, InvalidAlgorithmParameterException {
             synchronized (lock) {
                 if (sigSpi != null) {
-                    init(sigSpi, type, key, random);
                     return;
                 }
                 Exception lastException = null;
@@ -1103,7 +1245,7 @@ public abstract class Signature extends SignatureSpi {
                         s = serviceIterator.next();
                     }
                     // if provider says it does not support this key, ignore it
-                    if (s.supportsParameter(key) == false) {
+                    if (key != null && s.supportsParameter(key) == false) {
                         continue;
                     }
                     // if instance is not a SignatureSpi, ignore it
@@ -1112,7 +1254,7 @@ public abstract class Signature extends SignatureSpi {
                     }
                     try {
                         SignatureSpi spi = newInstance(s);
-                        init(spi, type, key, random);
+                        tryOperation(spi, type, key, params, random);
                         provider = s.getProvider();
                         sigSpi = spi;
                         firstService = null;
@@ -1134,6 +1276,10 @@ public abstract class Signature extends SignatureSpi {
                 if (lastException instanceof RuntimeException) {
                     throw (RuntimeException)lastException;
                 }
+                if (lastException instanceof InvalidAlgorithmParameterException) {
+                    throw (InvalidAlgorithmParameterException)lastException;
+                }
+
                 String k = (key != null) ? key.getClass().getName() : "(null)";
                 throw new InvalidKeyException
                     ("No installed provider supports this key: "
@@ -1141,21 +1287,34 @@ public abstract class Signature extends SignatureSpi {
             }
         }
 
-        private final static int I_PUB     = 1;
-        private final static int I_PRIV    = 2;
-        private final static int I_PRIV_SR = 3;
+        private static final int I_PUB           = 1;
+        private static final int I_PRIV          = 2;
+        private static final int I_PRIV_SR       = 3;
+        private static final int I_PUB_PARAM     = 4;
+        private static final int I_PRIV_PARAM_SR = 5;
+        private static final int S_PARAM         = 6;
 
-        private void init(SignatureSpi spi, int type, Key  key,
-                SecureRandom random) throws InvalidKeyException {
+        private void tryOperation(SignatureSpi spi, int type, Key  key,
+                AlgorithmParameterSpec params, SecureRandom random)
+                throws InvalidKeyException, InvalidAlgorithmParameterException {
             switch (type) {
             case I_PUB:
                 spi.engineInitVerify((PublicKey)key);
+                break;
+            case I_PUB_PARAM:
+                spi.engineInitVerify((PublicKey)key, params);
                 break;
             case I_PRIV:
                 spi.engineInitSign((PrivateKey)key);
                 break;
             case I_PRIV_SR:
                 spi.engineInitSign((PrivateKey)key, random);
+                break;
+            case I_PRIV_PARAM_SR:
+                spi.engineInitSign((PrivateKey)key, params, random);
+                break;
+            case S_PARAM:
+                spi.engineSetParameter(params);
                 break;
             default:
                 throw new AssertionError("Internal error: " + type);
@@ -1167,7 +1326,22 @@ public abstract class Signature extends SignatureSpi {
             if (sigSpi != null) {
                 sigSpi.engineInitVerify(publicKey);
             } else {
-                chooseProvider(I_PUB, publicKey, null);
+                try {
+                    chooseProvider(I_PUB, publicKey, null, null);
+                } catch (InvalidAlgorithmParameterException iape) {
+                    // should not happen, re-throw as IKE just in case
+                    throw new InvalidKeyException(iape);
+                }
+            }
+        }
+
+        void engineInitVerify(PublicKey publicKey,
+                AlgorithmParameterSpec params)
+                throws InvalidKeyException, InvalidAlgorithmParameterException {
+            if (sigSpi != null) {
+                sigSpi.engineInitVerify(publicKey, params);
+            } else {
+                chooseProvider(I_PUB_PARAM, publicKey, params, null);
             }
         }
 
@@ -1176,7 +1350,12 @@ public abstract class Signature extends SignatureSpi {
             if (sigSpi != null) {
                 sigSpi.engineInitSign(privateKey);
             } else {
-                chooseProvider(I_PRIV, privateKey, null);
+                try {
+                    chooseProvider(I_PRIV, privateKey, null, null);
+                } catch (InvalidAlgorithmParameterException iape) {
+                    // should not happen, re-throw as IKE just in case
+                    throw new InvalidKeyException(iape);
+                }
             }
         }
 
@@ -1185,7 +1364,22 @@ public abstract class Signature extends SignatureSpi {
             if (sigSpi != null) {
                 sigSpi.engineInitSign(privateKey, sr);
             } else {
-                chooseProvider(I_PRIV_SR, privateKey, sr);
+                try {
+                    chooseProvider(I_PRIV_SR, privateKey, null, sr);
+                } catch (InvalidAlgorithmParameterException iape) {
+                    // should not happen, re-throw as IKE just in case
+                    throw new InvalidKeyException(iape);
+                }
+            }
+        }
+
+        void engineInitSign(PrivateKey privateKey,
+                AlgorithmParameterSpec params, SecureRandom sr)
+                throws InvalidKeyException, InvalidAlgorithmParameterException {
+            if (sigSpi != null) {
+                sigSpi.engineInitSign(privateKey, params, sr);
+            } else {
+                chooseProvider(I_PRIV_PARAM_SR, privateKey, params, sr);
             }
         }
 
@@ -1236,8 +1430,16 @@ public abstract class Signature extends SignatureSpi {
 
         protected void engineSetParameter(AlgorithmParameterSpec params)
                 throws InvalidAlgorithmParameterException {
-            chooseFirstProvider();
-            sigSpi.engineSetParameter(params);
+            if (sigSpi != null) {
+                sigSpi.engineSetParameter(params);
+            } else {
+                try {
+                    chooseProvider(S_PARAM, null, params, null);
+                } catch (InvalidKeyException ike) {
+                    // should never happen, rethrow just in case
+                    throw new InvalidAlgorithmParameterException(ike);
+                }
+            }
         }
 
         protected Object engineGetParameter(String param)

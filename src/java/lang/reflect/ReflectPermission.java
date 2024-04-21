@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.reflect;
@@ -32,15 +32,19 @@ package java.lang.reflect;
  * provides a summary description of what the permission allows,
  * and discusses the risks of granting code the permission.
  *
- * <table border=1 cellpadding=5 summary="Table shows permission target name, what the permission allows, and associated risks">
+ * <table class="striped">
+ * <caption style="display:none">Table shows permission target name, what the permission allows, and associated risks</caption>
+ * <thead>
  * <tr>
- * <th>Permission Target Name</th>
- * <th>What the Permission Allows</th>
- * <th>Risks of Allowing this Permission</th>
+ * <th scope="col">Permission Target Name</th>
+ * <th scope="col">What the Permission Allows</th>
+ * <th scope="col">Risks of Allowing this Permission</th>
  * </tr>
+ * </thead>
+ * <tbody>
  *
  * <tr>
- *   <td>suppressAccessChecks</td>
+ *   <th scope="row">suppressAccessChecks</th>
  *   <td>ability to suppress the standard Java language access checks
  *       on fields and methods in a class; allow access not only public members
  *       but also allow access to default (package) access, protected,
@@ -49,7 +53,7 @@ package java.lang.reflect;
  *       methods normally unavailable would be accessible to malicious code.</td>
  * </tr>
  * <tr>
- *   <td>newProxyInPackage.{package name}</td>
+ *   <th scope="row">newProxyInPackage.{package name}</th>
  *   <td>ability to create a proxy instance in the specified package of which
  *       the non-public interface that the proxy class implements.</td>
  *   <td>This gives code access to classes in packages to which it normally
@@ -58,6 +62,7 @@ package java.lang.reflect;
  *       help in its attempt to compromise security in the system.</td>
  * </tr>
  *
+ * </tbody>
  * </table>
  *
  * @see java.security.Permission

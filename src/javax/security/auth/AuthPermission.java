@@ -1,43 +1,42 @@
 /*
- * Copyright (c) 1998, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1998, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package javax.security.auth;
 
 /**
- * This class is for authentication permissions.
- * An AuthPermission contains a name
- * (also referred to as a "target name")
- * but no actions list; you either have the named permission
- * or you don't.
+ * This class is for authentication permissions. An {@code AuthPermission}
+ * contains a name (also referred to as a "target name") but no actions
+ * list; you either have the named permission or you don't.
  *
  * <p> The target name is the name of a security configuration parameter
- * (see below).  Currently the AuthPermission object is used to
- * guard access to the Policy, Subject, LoginContext,
- * and Configuration objects.
+ * (see below).  Currently the {@code AuthPermission} object is used to
+ * guard access to the {@link Subject},
+ * {@link javax.security.auth.login.LoginContext}, and
+ * {@link javax.security.auth.login.Configuration} objects.
  *
- * <p> The possible target names for an Authentication Permission are:
+ * <p> The standard target names for an Authentication Permission are:
  *
  * <pre>
  *      doAs -                  allow the caller to invoke the
@@ -80,7 +79,7 @@ package javax.security.auth;
  *
  *      createLoginContext.{name} -  allow code to instantiate a
  *                              {@code LoginContext} with the
- *                              specified <i>name</i>.  <i>name</i>
+ *                              specified {@code name}.  {@code name}
  *                              is used as the index into the installed login
  *                              {@code Configuration}
  *                              (that returned by
@@ -102,6 +101,18 @@ package javax.security.auth;
  *                              login Configuration.
  * </pre>
  *
+ * <p>Please note that granting this permission with the "modifyPrincipals",
+ * "modifyPublicCredentials" or "modifyPrivateCredentials" target allows
+ * a JAAS login module to populate principal or credential objects into
+ * the Subject. Although reading information inside the private credentials
+ * set requires a {@link PrivateCredentialPermission} of the credential type to
+ * be granted, reading information inside the principals set and the public
+ * credentials set requires no additional permission. These objects can contain
+ * potentially sensitive information. For example, login modules that read
+ * local user information or perform a Kerberos login are able to add
+ * potentially sensitive information such as user ids, groups and domain names
+ * to the principals set.
+ *
  * <p> The following target name has been deprecated in favor of
  * {@code createLoginContext.{name}}.
  *
@@ -110,21 +121,10 @@ package javax.security.auth;
  *                              {@code LoginContext}.
  * </pre>
  *
- * <p> {@code javax.security.auth.Policy} has been
- * deprecated in favor of {@code java.security.Policy}.
- * Therefore, the following target names have also been deprecated:
- *
- * <pre>
- *      getPolicy -             allow the caller to retrieve the system-wide
- *                              Subject-based access control policy.
- *
- *      setPolicy -             allow the caller to set the system-wide
- *                              Subject-based access control policy.
- *
- *      refreshPolicy -         allow the caller to refresh the system-wide
- *                              Subject-based access control policy.
- * </pre>
- *
+ * @implNote
+ * Implementations may define additional target names, but should use naming
+ * conventions such as reverse domain name notation to avoid name clashes.
+ * @since 1.4
  */
 public final class AuthPermission extends
 java.security.BasicPermission {
@@ -134,8 +134,6 @@ java.security.BasicPermission {
     /**
      * Creates a new AuthPermission with the specified name.
      * The name is the symbolic name of the AuthPermission.
-     *
-     * <p>
      *
      * @param name the name of the AuthPermission
      *
@@ -154,9 +152,7 @@ java.security.BasicPermission {
      * The name is the symbolic name of the AuthPermission, and the
      * actions String is currently unused and should be null.
      *
-     * <p>
-     *
-     * @param name the name of the AuthPermission <p>
+     * @param name the name of the AuthPermission
      *
      * @param actions should be null.
      *

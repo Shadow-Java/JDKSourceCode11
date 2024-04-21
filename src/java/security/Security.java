@@ -1,35 +1,39 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
 
-import java.lang.reflect.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.io.*;
 import java.net.URL;
+
+import jdk.internal.event.EventHelper;
+import jdk.internal.event.SecurityPropertyModificationEvent;
+import jdk.internal.misc.SharedSecrets;
+import jdk.internal.util.StaticProperty;
 import sun.security.util.Debug;
 import sun.security.util.PropertyExpander;
 
@@ -41,9 +45,10 @@ import sun.security.jca.*;
  *
  * <p>The default values of security properties are read from an
  * implementation-specific location, which is typically the properties file
- * {@code lib/security/java.security} in the Java installation directory.
+ * {@code conf/security/java.security} in the Java installation directory.
  *
  * @author Benjamin Renaud
+ * @since 1.1
  */
 
 public final class Security {
@@ -66,7 +71,7 @@ public final class Security {
         // things in initialize that might require privs.
         // (the FileInputStream call and the File.exists call,
         // the securityPropFile call, etc)
-        AccessController.doPrivileged(new PrivilegedAction<Void>() {
+        AccessController.doPrivileged(new PrivilegedAction<>() {
             public Void run() {
                 initialize();
                 return null;
@@ -212,7 +217,7 @@ public final class Security {
         // maybe check for a system property which will specify where to
         // look. Someday.
         String sep = File.separator;
-        return new File(System.getProperty("java.home") + sep + "lib" + sep +
+        return new File(StaticProperty.javaHome() + sep + "conf" + sep +
                         "security" + sep + filename);
     }
 
@@ -280,8 +285,8 @@ public final class Security {
     /**
      * Gets a specified property for an algorithm. The algorithm name
      * should be a standard name. See the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
      * One possible use is by specialized algorithm parsers, which may map
@@ -510,8 +515,8 @@ public final class Security {
      * </ul>
      *
      * <p> See the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard cryptographic service names, standard
      * algorithm names and standard attribute names.
      *
@@ -549,7 +554,7 @@ public final class Security {
 
     /**
      * Returns an array containing all installed providers that satisfy the
-     * specified* selection criteria, or null if no such providers have been
+     * specified selection criteria, or null if no such providers have been
      * installed. The returned providers are ordered
      * according to their
      * {@linkplain #insertProviderAt(java.security.Provider, int)
@@ -581,8 +586,8 @@ public final class Security {
      * </ul>
      *
      * <p> See the <a href=
-     * "../../../technotes/guides/security/StandardNames.html">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard cryptographic service names, standard
      * algorithm names and standard attribute names.
      *
@@ -644,7 +649,7 @@ public final class Security {
             }
         }
 
-        if ((candidates == null) || (candidates.isEmpty()))
+        if (candidates == null || candidates.isEmpty())
             return null;
 
         Object[] candidatesArray = candidates.toArray();
@@ -789,9 +794,19 @@ public final class Security {
      * @see java.security.SecurityPermission
      */
     public static void setProperty(String key, String datum) {
-        check("setProperty."+key);
+        check("setProperty." + key);
         props.put(key, datum);
         invalidateSMCache(key);  /* See below. */
+
+        SecurityPropertyModificationEvent spe = new SecurityPropertyModificationEvent();
+        // following is a no-op if event is disabled
+        spe.key = key;
+        spe.value = datum;
+        spe.commit();
+
+        if (EventHelper.isLoggingSecurity()) {
+            EventHelper.logSecurityPropertyEvent(key, datum);
+        }
     }
 
     /*
@@ -800,9 +815,6 @@ public final class Security {
      * "package.definition", we need to signal to the SecurityManager
      * class that the value has just changed, and that it should
      * invalidate it's local cache values.
-     *
-     * Rather than create a new API entry for this function,
-     * we use reflection to set a private variable.
      */
     private static void invalidateSMCache(String key) {
 
@@ -810,42 +822,8 @@ public final class Security {
         final boolean pd = key.equals("package.definition");
 
         if (pa || pd) {
-            AccessController.doPrivileged(new PrivilegedAction<Void>() {
-                public Void run() {
-                    try {
-                        /* Get the class via the bootstrap class loader. */
-                        Class<?> cl = Class.forName(
-                            "java.lang.SecurityManager", false, null);
-                        Field f = null;
-                        boolean accessible = false;
-
-                        if (pa) {
-                            f = cl.getDeclaredField("packageAccessValid");
-                            accessible = f.isAccessible();
-                            f.setAccessible(true);
-                        } else {
-                            f = cl.getDeclaredField("packageDefinitionValid");
-                            accessible = f.isAccessible();
-                            f.setAccessible(true);
-                        }
-                        f.setBoolean(f, false);
-                        f.setAccessible(accessible);
-                    }
-                    catch (Exception e1) {
-                        /* If we couldn't get the class, it hasn't
-                         * been loaded yet.  If there is no such
-                         * field, we shouldn't try to set it.  There
-                         * shouldn't be a security execption, as we
-                         * are loaded by boot class loader, and we
-                         * are inside a doPrivileged() here.
-                         *
-                         * NOOP: don't do anything...
-                         */
-                    }
-                    return null;
-                }  /* run */
-            });  /* PrivilegedAction */
-        }  /* if */
+            SharedSecrets.getJavaLangAccess().invalidatePackageAccessCache();
+        }
     }
 
     private static void check(String directive) {
@@ -1027,11 +1005,11 @@ public final class Security {
         String algName = null;
         String attrName = null;
 
-        if (filterValue.length() == 0) {
+        if (filterValue.isEmpty()) {
             // The filterValue is an empty string. So the filterKey
             // should be in the format of <crypto_service>.<algorithm_or_type>.
             algName = filterKey.substring(algIndex + 1).trim();
-            if (algName.length() == 0) {
+            if (algName.isEmpty()) {
                 // There must be a algorithm or type name.
                 throw new InvalidParameterException("Invalid filter");
             }
@@ -1046,7 +1024,7 @@ public final class Security {
                 throw new InvalidParameterException("Invalid filter");
             } else {
                 attrName = filterKey.substring(attrIndex + 1).trim();
-                if (attrName.length() == 0) {
+                if (attrName.isEmpty()) {
                     // There is no attribute name in the filter.
                     throw new InvalidParameterException("Invalid filter");
                 }
@@ -1076,8 +1054,8 @@ public final class Security {
      * an empty Set if there is no provider that supports the
      * specified service or if serviceName is null. For a complete list
      * of Java cryptographic services, please see the
-     * <a href="../../../technotes/guides/security/crypto/CryptoSpec.html">Java
-     * Cryptography Architecture API Specification &amp; Reference</a>.
+     * {@extLink security_guide_jca
+     * Java Cryptography Architecture (JCA) Reference Guide}.
      * Note: the returned set is immutable.
      *
      * @param serviceName the name of the Java cryptographic
@@ -1092,7 +1070,7 @@ public final class Security {
      **/
     public static Set<String> getAlgorithms(String serviceName) {
 
-        if ((serviceName == null) || (serviceName.length() == 0) ||
+        if ((serviceName == null) || (serviceName.isEmpty()) ||
             (serviceName.endsWith("."))) {
             return Collections.emptySet();
         }
@@ -1114,7 +1092,7 @@ public final class Security {
                     // implementation of an algorithm. We are only interested
                     // in entries which lead to the implementation
                     // classes.
-                    if (currentKey.indexOf(" ") < 0) {
+                    if (currentKey.indexOf(' ') < 0) {
                         result.add(currentKey.substring(
                                                 serviceName.length() + 1));
                     }

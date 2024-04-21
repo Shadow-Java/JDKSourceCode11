@@ -1,31 +1,33 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 // -- This file was mechanically generated: Do not edit! -- //
 
 package java.nio;
+
+import jdk.internal.misc.Unsafe;
 
 
 class ByteBufferAsShortBufferL                  // package-private
@@ -35,7 +37,6 @@ class ByteBufferAsShortBufferL                  // package-private
 
 
     protected final ByteBuffer bb;
-    protected final int offset;
 
 
 
@@ -50,7 +51,7 @@ class ByteBufferAsShortBufferL                  // package-private
         this.limit(cap);
         int pos = this.position();
         assert (pos <= cap);
-        offset = pos;
+        address = bb.address;
 
 
 
@@ -58,25 +59,29 @@ class ByteBufferAsShortBufferL                  // package-private
 
     ByteBufferAsShortBufferL(ByteBuffer bb,
                                      int mark, int pos, int lim, int cap,
-                                     int off)
+                                     long addr)
     {
 
         super(mark, pos, lim, cap);
         this.bb = bb;
-        offset = off;
+        address = addr;
+        assert address >= bb.address;
 
 
 
     }
 
+    @Override
+    Object base() {
+        return bb.hb;
+    }
+
     public ShortBuffer slice() {
         int pos = this.position();
         int lim = this.limit();
-        assert (pos <= lim);
         int rem = (pos <= lim ? lim - pos : 0);
-        int off = (pos << 1) + offset;
-        assert (off >= 0);
-        return new ByteBufferAsShortBufferL(bb, -1, 0, rem, rem, off);
+        long addr = byteOffset(pos);
+        return new ByteBufferAsShortBufferL(bb, -1, 0, rem, rem, addr);
     }
 
     public ShortBuffer duplicate() {
@@ -85,7 +90,7 @@ class ByteBufferAsShortBufferL                  // package-private
                                                     this.position(),
                                                     this.limit(),
                                                     this.capacity(),
-                                                    offset);
+                                                    address);
     }
 
     public ShortBuffer asReadOnlyBuffer() {
@@ -95,7 +100,7 @@ class ByteBufferAsShortBufferL                  // package-private
                                                  this.position(),
                                                  this.limit(),
                                                  this.capacity(),
-                                                 offset);
+                                                 address);
 
 
 
@@ -103,17 +108,28 @@ class ByteBufferAsShortBufferL                  // package-private
 
 
 
-    protected int ix(int i) {
-        return (i << 1) + offset;
+    private int ix(int i) {
+        int off = (int) (address - bb.address);
+        return (i << 1) + off;
+    }
+
+    protected long byteOffset(long i) {
+        return (i << 1) + address;
     }
 
     public short get() {
-        return Bits.getShortL(bb, ix(nextGetIndex()));
+        short x = UNSAFE.getShortUnaligned(bb.hb, byteOffset(nextGetIndex()),
+            false);
+        return (x);
     }
 
     public short get(int i) {
-        return Bits.getShortL(bb, ix(checkIndex(i)));
+        short x = UNSAFE.getShortUnaligned(bb.hb, byteOffset(checkIndex(i)),
+            false);
+        return (x);
     }
+
+
 
 
 
@@ -125,7 +141,9 @@ class ByteBufferAsShortBufferL                  // package-private
 
     public ShortBuffer put(short x) {
 
-        Bits.putShortL(bb, ix(nextPutIndex()), x);
+        short y = (x);
+        UNSAFE.putShortUnaligned(bb.hb, byteOffset(nextPutIndex()), y,
+            false);
         return this;
 
 
@@ -134,7 +152,9 @@ class ByteBufferAsShortBufferL                  // package-private
 
     public ShortBuffer put(int i, short x) {
 
-        Bits.putShortL(bb, ix(checkIndex(i)), x);
+        short y = (x);
+        UNSAFE.putShortUnaligned(bb.hb, byteOffset(checkIndex(i)), y,
+            false);
         return this;
 
 
@@ -221,5 +241,10 @@ class ByteBufferAsShortBufferL                  // package-private
         return ByteOrder.LITTLE_ENDIAN;
 
     }
+
+
+
+
+
 
 }

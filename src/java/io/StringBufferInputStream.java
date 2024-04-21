@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1995, 2004, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
@@ -37,7 +37,7 @@ package java.io;
  * @author     Arthur van Hoff
  * @see        java.io.ByteArrayInputStream
  * @see        java.io.StringReader
- * @since      JDK1.0
+ * @since      1.0
  * @deprecated This class does not properly convert characters into bytes.  As
  *             of JDK&nbsp;1.1, the preferred way to create a stream from a
  *             string is via the <code>StringReader</code> class.
@@ -108,6 +108,7 @@ class StringBufferInputStream extends InputStream {
      *             <code>-1</code> if there is no more data because the end of
      *             the stream has been reached.
      */
+    @SuppressWarnings("deprecation")
     public synchronized int read(byte b[], int off, int len) {
         if (b == null) {
             throw new NullPointerException();
@@ -126,12 +127,8 @@ class StringBufferInputStream extends InputStream {
         if (len <= 0) {
             return 0;
         }
-        String  s = buffer;
-        int cnt = len;
-        while (--cnt >= 0) {
-            b[off++] = (byte)s.charAt(pos++);
-        }
-
+        buffer.getBytes(pos, pos + len, b, off);
+        pos += len;
         return len;
     }
 

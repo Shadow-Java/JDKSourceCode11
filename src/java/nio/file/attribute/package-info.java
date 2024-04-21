@@ -1,57 +1,77 @@
 /*
- * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /**
  * Interfaces and classes providing access to file and file system attributes.
  *
- * <blockquote><table cellspacing=1 cellpadding=0 summary="Attribute views">
- * <tr><th align="left">Attribute views</th><th align="left">Description</th></tr>
- * <tr><td valign=top><tt><i>{@link java.nio.file.attribute.AttributeView}</i></tt></td>
+ * <table class="striped" style="padding-left:2em; text-align:left">
+ *     <caption style="display:none">Attribute views</caption>
+ * <thead>
+ * <tr><th scope="col">Attribute views</th>
+ *     <th scope="col">Description</th></tr>
+ * </thead>
+ * <tbody>
+ * <tr><th scope="row"><i>{@link java.nio.file.attribute.AttributeView}</i></th>
  *     <td>Can read or update non-opaque values associated with objects in a file system</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;<i>{@link java.nio.file.attribute.FileAttributeView}</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:1em"><i>{@link java.nio.file.attribute.FileAttributeView}</i></span></th>
  *     <td>Can read or update file attributes</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>{@link java.nio.file.attribute.BasicFileAttributeView}&nbsp;&nbsp;</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:2em">
+ *     <i>{@link java.nio.file.attribute.BasicFileAttributeView}</i></span></th>
  *     <td>Can read or update a basic set of file attributes</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>{@link java.nio.file.attribute.PosixFileAttributeView}&nbsp;&nbsp;</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:3em">
+ *     <i>{@link java.nio.file.attribute.PosixFileAttributeView}</i></span></th>
  *     <td>Can read or update POSIX defined file attributes</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>{@link java.nio.file.attribute.DosFileAttributeView}&nbsp;&nbsp;</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:3em">
+ *     <i>{@link java.nio.file.attribute.DosFileAttributeView}</i></span></th>
  *     <td>Can read or update FAT file attributes</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>{@link java.nio.file.attribute.FileOwnerAttributeView}&nbsp;&nbsp;</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:2em">
+ *     <i>{@link java.nio.file.attribute.FileOwnerAttributeView}</i></span></th>
  *     <td>Can read or update the owner of a file</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>{@link java.nio.file.attribute.AclFileAttributeView}&nbsp;&nbsp;</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:3em">
+ *     <i>{@link java.nio.file.attribute.AclFileAttributeView}</i></span></th>
  *     <td>Can read or update Access Control Lists</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>{@link java.nio.file.attribute.UserDefinedFileAttributeView}&nbsp;&nbsp;</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:2em">
+ *     <i>{@link java.nio.file.attribute.UserDefinedFileAttributeView}</i></span></th>
  *     <td>Can read or update user-defined file attributes</td></tr>
- * <tr><td valign=top><tt>&nbsp;&nbsp;<i>{@link java.nio.file.attribute.FileStoreAttributeView}</i></tt></td>
+ * <tr><th scope="row">
+ *     <span style="padding-left:1em"><i>{@link java.nio.file.attribute.FileStoreAttributeView}</i></span></th>
  *     <td>Can read or update file system attributes</td></tr>
- * </table></blockquote>
+ * </tbody>
+ * </table>
  *
  * <p> An attribute view provides a read-only or updatable view of the non-opaque
  * values, or <em>metadata</em>, associated with objects in a file system.
  * The {@link java.nio.file.attribute.FileAttributeView} interface is
- * extended by several other interfaces that that views to specific sets of file
+ * extended by several other interfaces that provide views to specific sets of file
  * attributes. {@code FileAttributeViews} are selected by invoking the {@link
  * java.nio.file.Files#getFileAttributeView} method with a
  * <em>type-token</em> to identify the required view. Views can also be identified
@@ -100,7 +120,7 @@
  * </ul>
  *
  *
- * <p> Unless otherwise noted, passing a <tt>null</tt> argument to a constructor
+ * <p> Unless otherwise noted, passing a {@code null} argument to a constructor
  * or method in any class or interface in this package will cause a {@link
  * java.lang.NullPointerException NullPointerException} to be thrown.
  *

@@ -1,31 +1,32 @@
 /*
- * Copyright (c) 1997, 2017, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.ref;
 
 import java.util.function.Consumer;
+import jdk.internal.misc.VM;
 
 /**
  * Reference queues, to which registered reference objects are appended by the
@@ -42,18 +43,18 @@ public class ReferenceQueue<T> {
      */
     public ReferenceQueue() { }
 
-    private static class Null<S> extends ReferenceQueue<S> {
-        boolean enqueue(Reference<? extends S> r) {
+    private static class Null extends ReferenceQueue<Object> {
+        boolean enqueue(Reference<?> r) {
             return false;
         }
     }
 
-    static ReferenceQueue<Object> NULL = new Null<>();
-    static ReferenceQueue<Object> ENQUEUED = new Null<>();
+    static final ReferenceQueue<Object> NULL = new Null();
+    static final ReferenceQueue<Object> ENQUEUED = new Null();
 
-    static private class Lock { };
-    private Lock lock = new Lock();
-    private volatile Reference<? extends T> head = null;
+    private static class Lock { };
+    private final Lock lock = new Lock();
+    private volatile Reference<? extends T> head;
     private long queueLength = 0;
 
     boolean enqueue(Reference<? extends T> r) { /* Called only by Reference class */
@@ -65,12 +66,16 @@ public class ReferenceQueue<T> {
                 return false;
             }
             assert queue == this;
-            r.queue = ENQUEUED;
+            // Self-loop end, so if a FinalReference it remains inactive.
             r.next = (head == null) ? r : head;
             head = r;
             queueLength++;
+            // Update r.queue *after* adding to list, to avoid race
+            // with concurrent enqueued checks and fast-path poll().
+            // Volatiles ensure ordering.
+            r.queue = ENQUEUED;
             if (r instanceof FinalReference) {
-                sun.misc.VM.addFinalRefCount(1);
+                VM.addFinalRefCount(1);
             }
             lock.notifyAll();
             return true;
@@ -80,14 +85,20 @@ public class ReferenceQueue<T> {
     private Reference<? extends T> reallyPoll() {       /* Must hold lock */
         Reference<? extends T> r = head;
         if (r != null) {
+            r.queue = NULL;
+            // Update r.queue *before* removing from list, to avoid
+            // race with concurrent enqueued checks and fast-path
+            // poll().  Volatiles ensure ordering.
             @SuppressWarnings("unchecked")
             Reference<? extends T> rn = r.next;
+            // Handle self-looped next as end of list designator.
             head = (rn == r) ? null : rn;
-            r.queue = NULL;
+            // Self-loop next rather than setting to null, so if a
+            // FinalReference it remains inactive.
             r.next = r;
             queueLength--;
             if (r instanceof FinalReference) {
-                sun.misc.VM.addFinalRefCount(-1);
+                VM.addFinalRefCount(-1);
             }
             return r;
         }
@@ -97,10 +108,10 @@ public class ReferenceQueue<T> {
     /**
      * Polls this queue to see if a reference object is available.  If one is
      * available without further delay then it is removed from the queue and
-     * returned.  Otherwise this method immediately returns <tt>null</tt>.
+     * returned.  Otherwise this method immediately returns {@code null}.
      *
      * @return  A reference object, if one was immediately available,
-     *          otherwise <code>null</code>
+     *          otherwise {@code null}
      */
     public Reference<? extends T> poll() {
         if (head == null)
@@ -117,12 +128,12 @@ public class ReferenceQueue<T> {
      * <p> This method does not offer real-time guarantees: It schedules the
      * timeout as if by invoking the {@link Object#wait(long)} method.
      *
-     * @param  timeout  If positive, block for up to <code>timeout</code>
+     * @param  timeout  If positive, block for up to {@code timeout}
      *                  milliseconds while waiting for a reference to be
      *                  added to this queue.  If zero, block indefinitely.
      *
      * @return  A reference object, if one was available within the specified
-     *          timeout period, otherwise <code>null</code>
+     *          timeout period, otherwise {@code null}
      *
      * @throws  IllegalArgumentException
      *          If the value of the timeout argument is negative

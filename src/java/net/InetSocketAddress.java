@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.net;
 
@@ -157,7 +157,7 @@ public class InetSocketAddress
      * A valid port value is between 0 and 65535.
      * A port number of {@code zero} will let the system pick up an
      * ephemeral port in a {@code bind} operation.
-     * <p>
+     *
      * @param   port    The port number
      * @throws IllegalArgumentException if the port parameter is outside the specified
      * range of valid port values.
@@ -175,7 +175,7 @@ public class InetSocketAddress
      * ephemeral port in a {@code bind} operation.
      * <P>
      * A {@code null} address will assign the <i>wildcard</i> address.
-     * <p>
+     *
      * @param   addr    The IP address
      * @param   port    The port number
      * @throws IllegalArgumentException if the port parameter is outside the specified
@@ -202,11 +202,11 @@ public class InetSocketAddress
      * A valid port value is between 0 and 65535.
      * A port number of {@code zero} will let the system pick up an
      * ephemeral port in a {@code bind} operation.
-     * <P>
+     *
      * @param   hostname the Host name
      * @param   port    The port number
      * @throws IllegalArgumentException if the port parameter is outside the range
-     * of valid port values, or if the hostname parameter is <TT>null</TT>.
+     * of valid port values, or if the hostname parameter is {@code null}.
      * @throws SecurityException if a security manager is present and
      *                           permission to resolve the host name is
      *                           denied.
@@ -239,14 +239,14 @@ public class InetSocketAddress
      * A valid port value is between 0 and 65535.
      * A port number of {@code zero} will let the system pick up an
      * ephemeral port in a {@code bind} operation.
-     * <P>
+     *
      * @param   host    the Host name
      * @param   port    The port number
      * @throws IllegalArgumentException if the port parameter is outside
      *                  the range of valid port values, or if the hostname
-     *                  parameter is <TT>null</TT>.
+     *                  parameter is {@code null}.
      * @see     #isUnresolved()
-     * @return  a {@code InetSocketAddress} representing the unresolved
+     * @return  an {@code InetSocketAddress} representing the unresolved
      *          socket address
      * @since 1.5
      */
@@ -302,18 +302,10 @@ public class InetSocketAddress
         throw new InvalidObjectException("Stream data required");
     }
 
-    private static final long FIELDS_OFFSET;
-    private static final sun.misc.Unsafe UNSAFE;
-    static {
-        try {
-            sun.misc.Unsafe unsafe = sun.misc.Unsafe.getUnsafe();
-            FIELDS_OFFSET = unsafe.objectFieldOffset(
-                    InetSocketAddress.class.getDeclaredField("holder"));
-            UNSAFE = unsafe;
-        } catch (ReflectiveOperationException e) {
-            throw new Error(e);
-        }
-    }
+    private static final jdk.internal.misc.Unsafe UNSAFE
+            = jdk.internal.misc.Unsafe.getUnsafe();
+    private static final long FIELDS_OFFSET
+            = UNSAFE.objectFieldOffset(InetSocketAddress.class, "holder");
 
     /**
      * Gets the port number.
@@ -325,10 +317,9 @@ public class InetSocketAddress
     }
 
     /**
-     *
      * Gets the {@code InetAddress}.
      *
-     * @return the InetAdress or {@code null} if it is unresolved.
+     * @return the InetAddress or {@code null} if it is unresolved.
      */
     public final InetAddress getAddress() {
         return holder.getAddress();

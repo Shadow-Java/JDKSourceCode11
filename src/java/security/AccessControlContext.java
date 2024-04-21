@@ -1,33 +1,35 @@
 /*
  * Copyright (c) 1997, 2015, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import sun.security.util.Debug;
+import sun.security.util.FilePermCompat;
 import sun.security.util.SecurityConstants;
 
 
@@ -72,11 +74,12 @@ import sun.security.util.SecurityConstants;
  * @see AccessController
  *
  * @author Roland Schemers
+ * @since 1.2
  */
 
 public final class AccessControlContext {
 
-    private ProtectionDomain context[];
+    private ProtectionDomain[] context;
     // isPrivileged and isAuthorized are referenced by the VM - do not remove
     // or change their names
     private boolean isPrivileged;
@@ -89,13 +92,13 @@ public final class AccessControlContext {
     private DomainCombiner combiner = null;
 
     // limited privilege scope
-    private Permission permissions[];
+    private Permission[] permissions;
     private AccessControlContext parent;
     private boolean isWrapped;
 
     // is constrained by limited privilege scope?
     private boolean isLimited;
-    private ProtectionDomain limitedContext[];
+    private ProtectionDomain[] limitedContext;
 
     private static boolean debugInit = false;
     private static Debug debug = null;
@@ -123,7 +126,7 @@ public final class AccessControlContext {
      * changes to the array will not affect this AccessControlContext.
      * @throws NullPointerException if {@code context} is {@code null}
      */
-    public AccessControlContext(ProtectionDomain context[])
+    public AccessControlContext(ProtectionDomain[] context)
     {
         if (context.length == 0) {
             this.context = null;
@@ -153,8 +156,6 @@ public final class AccessControlContext {
      * {@code DomainCombiner} with the provided
      * {@code AccessControlContext}.
      *
-     * <p>
-     *
      * @param acc the {@code AccessControlContext} associated
      *          with the provided {@code DomainCombiner}.
      *
@@ -177,7 +178,7 @@ public final class AccessControlContext {
 
     /**
      * package private to allow calls from ProtectionDomain without performing
-     * the security check for {@linkplain SecurityConstants.CREATE_ACC_PERMISSION}
+     * the security check for {@linkplain SecurityConstants#CREATE_ACC_PERMISSION}
      * permission
      */
     AccessControlContext(AccessControlContext acc,
@@ -255,7 +256,8 @@ public final class AccessControlContext {
                 if (perms[i].getClass() == AllPermission.class) {
                     parent = null;
                 }
-                tmp[i] = perms[i];
+                // Add altPath into permission for compatibility.
+                tmp[i] = FilePermCompat.newPermPlusAltPath(perms[i]);
             }
         }
 
@@ -284,7 +286,7 @@ public final class AccessControlContext {
      * package private constructor for AccessController.getContext()
      */
 
-    AccessControlContext(ProtectionDomain context[],
+    AccessControlContext(ProtectionDomain[] context,
                          boolean isPrivileged)
     {
         this.context = context;
@@ -337,8 +339,6 @@ public final class AccessControlContext {
     /**
      * Get the {@code DomainCombiner} associated with this
      * {@code AccessControlContext}.
-     *
-     * <p>
      *
      * @return the {@code DomainCombiner} associated with this
      *          {@code AccessControlContext}, or {@code null}
@@ -447,7 +447,7 @@ public final class AccessControlContext {
         }
 
         for (int i=0; i< context.length; i++) {
-            if (context[i] != null &&  !context[i].implies(perm)) {
+            if (context[i] != null && !context[i].impliesWithAltFilePerm(perm)) {
                 if (dumpDebug) {
                     debug.println("access denied " + perm);
                 }
@@ -462,7 +462,7 @@ public final class AccessControlContext {
                     Thread.dumpStack();
                     final ProtectionDomain pd = context[i];
                     final Debug db = debug;
-                    AccessController.doPrivileged (new PrivilegedAction<Void>() {
+                    AccessController.doPrivileged (new PrivilegedAction<>() {
                         public Void run() {
                             db.println("domain that failed "+pd);
                             return null;
@@ -647,7 +647,7 @@ public final class AccessControlContext {
     /*
      * Combine the current (stack) and assigned domains.
      */
-    private static ProtectionDomain[] combine(ProtectionDomain[]current,
+    private static ProtectionDomain[] combine(ProtectionDomain[] current,
         ProtectionDomain[] assigned) {
 
         // current could be null if only system code is on the stack;
@@ -670,7 +670,7 @@ public final class AccessControlContext {
         int n = (skipAssigned) ? 0 : assigned.length;
 
         // now we combine both of them, and create a new context
-        ProtectionDomain pd[] = new ProtectionDomain[slen + n];
+        ProtectionDomain[] pd = new ProtectionDomain[slen + n];
 
         // first copy in the assigned context domains, no need to compress
         if (!skipAssigned) {
@@ -699,7 +699,7 @@ public final class AccessControlContext {
             } else if (skipAssigned && n == slen) {
                 return current;
             }
-            ProtectionDomain tmp[] = new ProtectionDomain[n];
+            ProtectionDomain[] tmp = new ProtectionDomain[n];
             System.arraycopy(pd, 0, tmp, 0, n);
             pd = tmp;
         }
@@ -738,12 +738,12 @@ public final class AccessControlContext {
 
     /**
      * Checks two AccessControlContext objects for equality.
-     * Checks that <i>obj</i> is
+     * Checks that {@code obj} is
      * an AccessControlContext and has the same set of ProtectionDomains
      * as this context.
-     * <P>
+     *
      * @param obj the object we are testing for equality with this object.
-     * @return true if <i>obj</i> is an AccessControlContext, and has the
+     * @return true if {@code obj} is an AccessControlContext, and has the
      * same set of ProtectionDomains as this context, false otherwise.
      */
     public boolean equals(Object obj) {

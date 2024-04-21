@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1995, 2016, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1995, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -40,8 +40,7 @@ import sun.net.ConnectionResetException;
  * @author      Jonathan Payne
  * @author      Arthur van Hoff
  */
-class SocketInputStream extends FileInputStream
-{
+class SocketInputStream extends FileInputStream {
     static {
         init();
     }
@@ -163,8 +162,6 @@ class SocketInputStream extends FileInputStream
                     + " off == " + off + " buffer length == " + b.length);
         }
 
-        boolean gotReset = false;
-
         // acquire file descriptor and do the read
         FileDescriptor fd = impl.acquireFD();
         try {
@@ -173,27 +170,9 @@ class SocketInputStream extends FileInputStream
                 return n;
             }
         } catch (ConnectionResetException rstExc) {
-            gotReset = true;
+            impl.setConnectionReset();
         } finally {
             impl.releaseFD();
-        }
-
-        /*
-         * We receive a "connection reset" but there may be bytes still
-         * buffered on the socket
-         */
-        if (gotReset) {
-            impl.setConnectionResetPending();
-            impl.acquireFD();
-            try {
-                n = socketRead(fd, b, off, length, timeout);
-                if (n > 0) {
-                    return n;
-                }
-            } catch (ConnectionResetException rstExc) {
-            } finally {
-                impl.releaseFD();
-            }
         }
 
         /*
@@ -202,9 +181,6 @@ class SocketInputStream extends FileInputStream
          */
         if (impl.isClosedOrPending()) {
             throw new SocketException("Socket closed");
-        }
-        if (impl.isConnectionResetPending()) {
-            impl.setConnectionReset();
         }
         if (impl.isConnectionReset()) {
             throw new SocketException("Connection reset");
@@ -283,10 +259,11 @@ class SocketInputStream extends FileInputStream
     /**
      * Overrides finalize, the fd is closed by the Socket.
      */
+    @SuppressWarnings({"deprecation", "removal"})
     protected void finalize() {}
 
     /**
      * Perform class load-time initializations.
      */
-    private native static void init();
+    private static native void init();
 }

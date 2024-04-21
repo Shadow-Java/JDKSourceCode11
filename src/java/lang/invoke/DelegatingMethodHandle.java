@@ -1,32 +1,34 @@
 /*
  * Copyright (c) 2014, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.invoke;
 
 import java.util.Arrays;
 import static java.lang.invoke.LambdaForm.*;
+import static java.lang.invoke.LambdaForm.Kind.*;
+import static java.lang.invoke.MethodHandleNatives.Constants.REF_invokeVirtual;
 import static java.lang.invoke.MethodHandleStatics.*;
 
 /**
@@ -49,7 +51,7 @@ abstract class DelegatingMethodHandle extends MethodHandle {
     }
 
     /** Define this to extract the delegated target which supplies the invocation behavior. */
-    abstract protected MethodHandle getTarget();
+    protected abstract MethodHandle getTarget();
 
     @Override
     abstract MethodHandle asTypeUncached(MethodType newType);
@@ -96,24 +98,18 @@ abstract class DelegatingMethodHandle extends MethodHandle {
                                         int whichCache,
                                         Object constraint,
                                         NamedFunction getTargetFn) {
-        String debugString;
-        switch(whichCache) {
-            case MethodTypeForm.LF_REBIND:            debugString = "BMH.reinvoke";      break;
-            case MethodTypeForm.LF_DELEGATE:          debugString = "MH.delegate";       break;
-            default:                                  debugString = "MH.reinvoke";       break;
-        }
         // No pre-action needed.
-        return makeReinvokerForm(target, whichCache, constraint, debugString, true, getTargetFn, null);
+        return makeReinvokerForm(target, whichCache, constraint, true, getTargetFn, null);
     }
     /** Create a LF which simply reinvokes a target of the given basic type. */
     static LambdaForm makeReinvokerForm(MethodHandle target,
                                         int whichCache,
                                         Object constraint,
-                                        String debugString,
                                         boolean forceInline,
                                         NamedFunction getTargetFn,
                                         NamedFunction preActionFn) {
         MethodType mtype = target.type().basicType();
+        Kind kind = whichKind(whichCache);
         boolean customized = (whichCache < 0 ||
                 mtype.parameterSlotCount() > MethodType.MAX_MH_INVOKER_ARITY);
         boolean hasPreAction = (preActionFn != null);
@@ -145,20 +141,39 @@ abstract class DelegatingMethodHandle extends MethodHandle {
             targetArgs[0] = names[NEXT_MH];  // overwrite this MH with next MH
             names[REINVOKE] = new LambdaForm.Name(mtype, targetArgs);
         }
-        form = new LambdaForm(debugString, ARG_LIMIT, names, forceInline);
+        form = new LambdaForm(ARG_LIMIT, names, forceInline, kind);
         if (!customized) {
             form = mtype.form().setCachedLambdaForm(whichCache, form);
         }
         return form;
     }
 
+    private static Kind whichKind(int whichCache) {
+        switch(whichCache) {
+            case MethodTypeForm.LF_REBIND:   return BOUND_REINVOKER;
+            case MethodTypeForm.LF_DELEGATE: return DELEGATE;
+            default:                         return REINVOKER;
+        }
+    }
+
     static final NamedFunction NF_getTarget;
     static {
         try {
-            NF_getTarget = new NamedFunction(DelegatingMethodHandle.class
-                                             .getDeclaredMethod("getTarget"));
+            MemberName member = new MemberName(DelegatingMethodHandle.class, "getTarget",
+                    MethodType.methodType(MethodHandle.class), REF_invokeVirtual);
+            NF_getTarget = new NamedFunction(
+                    MemberName.getFactory()
+                            .resolveOrFail(REF_invokeVirtual, member, DelegatingMethodHandle.class, NoSuchMethodException.class));
         } catch (ReflectiveOperationException ex) {
             throw newInternalError(ex);
         }
+        // The Holder class will contain pre-generated DelegatingMethodHandles resolved
+        // speculatively using MemberName.getFactory().resolveOrNull. However, that
+        // doesn't initialize the class, which subtly breaks inlining etc. By forcing
+        // initialization of the Holder class we avoid these issues.
+        UNSAFE.ensureClassInitialized(Holder.class);
     }
+
+    /* Placeholder class for DelegatingMethodHandles generated ahead of time */
+    final class Holder {}
 }

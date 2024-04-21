@@ -1,36 +1,40 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.net;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.BufferedOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
+
+import jdk.internal.util.StaticProperty;
 import sun.net.SocksProxy;
+import sun.net.spi.DefaultProxySelector;
 import sun.net.www.ParseUtil;
 /* import org.ietf.jgss.*; */
 
@@ -69,10 +73,19 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
             server = ad.getHostString();
             serverPort = ad.getPort();
         }
+        useV4 = useV4(proxy);
     }
 
     void setV4() {
         useV4 = true;
+    }
+
+    private static boolean useV4(Proxy proxy) {
+        if (proxy instanceof SocksProxy
+            && ((SocksProxy)proxy).protocolVersion() == 4) {
+            return true;
+        }
+        return DefaultProxySelector.socksProxyVersion() == 4;
     }
 
     private synchronized void privilegedConnect(final String host,
@@ -82,7 +95,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
     {
         try {
             AccessController.doPrivileged(
-                new java.security.PrivilegedExceptionAction<Void>() {
+                new java.security.PrivilegedExceptionAction<>() {
                     public Void run() throws IOException {
                               superConnectServer(host, port, timeout);
                               cmdIn = getInputStream();
@@ -118,7 +131,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
     private int readSocksReply(InputStream in, byte[] data, long deadlineMillis) throws IOException {
         int len = data.length;
         int received = 0;
-        for (int attempts = 0; received < len && attempts < 3; attempts++) {
+        while (received < len) {
             int count;
             try {
                 count = ((SocketInputStream)in).read(data, received, len - received, remainingMillis(deadlineMillis));
@@ -157,7 +170,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
             final InetAddress addr = InetAddress.getByName(server);
             PasswordAuthentication pw =
                 java.security.AccessController.doPrivileged(
-                    new java.security.PrivilegedAction<PasswordAuthentication>() {
+                    new java.security.PrivilegedAction<>() {
                         public PasswordAuthentication run() {
                                 return Authenticator.requestPasswordAuthentication(
                                        server, addr, serverPort, "SOCKS5", "SOCKS authentication", null);
@@ -167,25 +180,16 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
                 userName = pw.getUserName();
                 password = new String(pw.getPassword());
             } else {
-                userName = java.security.AccessController.doPrivileged(
-                        new sun.security.action.GetPropertyAction("user.name"));
+                userName = StaticProperty.userName();
             }
             if (userName == null)
                 return false;
             out.write(1);
             out.write(userName.length());
-            try {
-                out.write(userName.getBytes("ISO-8859-1"));
-            } catch (java.io.UnsupportedEncodingException uee) {
-                assert false;
-            }
+            out.write(userName.getBytes(StandardCharsets.ISO_8859_1));
             if (password != null) {
                 out.write(password.length());
-                try {
-                    out.write(password.getBytes("ISO-8859-1"));
-                } catch (java.io.UnsupportedEncodingException uee) {
-                    assert false;
-                }
+                out.write(password.getBytes(StandardCharsets.ISO_8859_1));
             } else
                 out.write(0);
             out.flush();
@@ -270,11 +274,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
         out.write((endpoint.getPort() >> 0) & 0xff);
         out.write(endpoint.getAddress().getAddress());
         String userName = getUserName();
-        try {
-            out.write(userName.getBytes("ISO-8859-1"));
-        } catch (java.io.UnsupportedEncodingException uee) {
-            assert false;
-        }
+        out.write(userName.getBytes(StandardCharsets.ISO_8859_1));
         out.write(0);
         out.flush();
         byte[] data = new byte[8];
@@ -351,7 +351,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
             // server is not null only when the socket was created with a
             // specified proxy in which case it does bypass the ProxySelector
             ProxySelector sel = java.security.AccessController.doPrivileged(
-                new java.security.PrivilegedAction<ProxySelector>() {
+                new java.security.PrivilegedAction<>() {
                     public ProxySelector run() {
                             return ProxySelector.getDefault();
                         }
@@ -368,7 +368,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
             String host = epoint.getHostString();
             // IPv6 litteral?
             if (epoint.getAddress() instanceof Inet6Address &&
-                (!host.startsWith("[")) && (host.indexOf(":") >= 0)) {
+                (!host.startsWith("[")) && (host.indexOf(':') >= 0)) {
                 host = "[" + host + "]";
             }
             try {
@@ -398,11 +398,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
                 // Use getHostString() to avoid reverse lookups
                 server = ((InetSocketAddress) p.address()).getHostString();
                 serverPort = ((InetSocketAddress) p.address()).getPort();
-                if (p instanceof SocksProxy) {
-                    if (((SocksProxy)p).protocolVersion() == 4) {
-                        useV4 = true;
-                    }
-                }
+                useV4 = useV4(p);
 
                 // Connects to the SOCKS server
                 try {
@@ -479,11 +475,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
         if (epoint.isUnresolved()) {
             out.write(DOMAIN_NAME);
             out.write(epoint.getHostName().length());
-            try {
-                out.write(epoint.getHostName().getBytes("ISO-8859-1"));
-            } catch (java.io.UnsupportedEncodingException uee) {
-                assert false;
-            }
+            out.write(epoint.getHostName().getBytes(StandardCharsets.ISO_8859_1));
             out.write((epoint.getPort() >> 8) & 0xff);
             out.write((epoint.getPort() >> 0) & 0xff);
         } else if (epoint.getAddress() instanceof Inet6Address) {
@@ -520,7 +512,11 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
                     throw new SocketException("Reply from SOCKS server badly formatted");
                 break;
             case DOMAIN_NAME:
-                len = data[1];
+                byte[] lenByte = new byte[1];
+                i = readSocksReply(in, lenByte, deadlineMillis);
+                if (i != 1)
+                    throw new SocketException("Reply from SOCKS server badly formatted");
+                len = lenByte[0] & 0xFF;
                 byte[] host = new byte[len];
                 i = readSocksReply(in, host, deadlineMillis);
                 if (i != len)
@@ -531,7 +527,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
                     throw new SocketException("Reply from SOCKS server badly formatted");
                 break;
             case IPV6:
-                len = data[1];
+                len = 16;
                 addr = new byte[len];
                 i = readSocksReply(in, addr, deadlineMillis);
                 if (i != len)
@@ -591,7 +587,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
         InetAddress naddr = baddr;
         if (naddr.isAnyLocalAddress()) {
             naddr = AccessController.doPrivileged(
-                        new PrivilegedAction<InetAddress>() {
+                        new PrivilegedAction<>() {
                             public InetAddress run() {
                                 return cmdsock.getLocalAddress();
 
@@ -647,7 +643,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
 
     /**
      * Sends the Bind request to the SOCKS proxy. In the SOCKS protocol, bind
-     * means "accept incoming connection from", so the SocketAddress is the
+     * means "accept incoming connection from", so the SocketAddress is
      * the one of the host we do accept connection from.
      *
      * @param      saddr   the Socket address of the remote host.
@@ -667,7 +663,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
             // server is not null only when the socket was created with a
             // specified proxy in which case it does bypass the ProxySelector
             ProxySelector sel = java.security.AccessController.doPrivileged(
-                new java.security.PrivilegedAction<ProxySelector>() {
+                new java.security.PrivilegedAction<>() {
                     public ProxySelector run() {
                             return ProxySelector.getDefault();
                         }
@@ -683,7 +679,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
             String host = saddr.getHostString();
             // IPv6 litteral?
             if (saddr.getAddress() instanceof Inet6Address &&
-                (!host.startsWith("[")) && (host.indexOf(":") >= 0)) {
+                (!host.startsWith("[")) && (host.indexOf(':') >= 0)) {
                 host = "[" + host + "]";
             }
             try {
@@ -711,16 +707,12 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
                 // Use getHostString() to avoid reverse lookups
                 server = ((InetSocketAddress) p.address()).getHostString();
                 serverPort = ((InetSocketAddress) p.address()).getPort();
-                if (p instanceof SocksProxy) {
-                    if (((SocksProxy)p).protocolVersion() == 4) {
-                        useV4 = true;
-                    }
-                }
+                useV4 = useV4(p);
 
                 // Connects to the SOCKS server
                 try {
                     AccessController.doPrivileged(
-                        new PrivilegedExceptionAction<Void>() {
+                        new PrivilegedExceptionAction<>() {
                             public Void run() throws Exception {
                                 cmdsock = new Socket(new PlainSocketImpl());
                                 cmdsock.connect(new InetSocketAddress(server, serverPort));
@@ -751,7 +743,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
         } else {
             try {
                 AccessController.doPrivileged(
-                    new PrivilegedExceptionAction<Void>() {
+                    new PrivilegedExceptionAction<>() {
                         public Void run() throws Exception {
                             cmdsock = new Socket(new PlainSocketImpl());
                             cmdsock.connect(new InetSocketAddress(server, serverPort));
@@ -1082,8 +1074,7 @@ class SocksSocketImpl extends PlainSocketImpl implements SocksConsts {
                 userName = System.getProperty("user.name");
             } catch (SecurityException se) { /* swallow Exception */ }
         } else {
-            userName = java.security.AccessController.doPrivileged(
-                new sun.security.action.GetPropertyAction("user.name"));
+            userName = StaticProperty.userName();
         }
         return userName;
     }

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2005, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util;
@@ -231,7 +231,7 @@ class LocaleISOData {
         + "AI" + "AIA"  // Anguilla
         + "AL" + "ALB"  // Albania, People's Socialist Republic of
         + "AM" + "ARM"  // Armenia
-        + "AN" + "ANT"  // Netherlands Antilles
+//      + "AN" + "ANT"  // Netherlands Antilles
         + "AO" + "AGO"  // Angola, Republic of
         + "AQ" + "ATA"  // Antarctica (the territory South of 60 deg S)
         + "AR" + "ARG"  // Argentina, Argentine Republic
@@ -476,6 +476,29 @@ class LocaleISOData {
         + "ZM" + "ZMB"  // Zambia, Republic of
         + "ZW" + "ZWE"  // Zimbabwe
         ;
+
+    /**
+     * Array to hold country codes for ISO3166-3.
+     */
+    static final String[] ISO3166_3 = {
+        "AIDJ", "ANHH", "BQAQ", "BUMM", "BYAA", "CSHH", "CSXX", "CTKI", "DDDE",
+        "DYBJ", "FQHH", "FXFR", "GEHH", "HVBF", "JTUM", "MIUM", "NHVU", "NQAQ",
+        "NTHH", "PCHH", "PUUM", "PZPA", "RHZW", "SKIN", "SUHH", "TPTL", "VDVN",
+        "WKUM", "YDYE", "YUCS", "ZRCD"
+    };
+
+    /**
+     * This method computes a set of ISO3166-1 alpha-3 country codes from
+     * existing isoCountryTable.
+     */
+    static Set<String> computeISO3166_1Alpha3Countries() {
+        int tableLength = isoCountryTable.length();
+        String[] isoTable = new String[tableLength / 5];
+        for (int i = 0, index = 0; index < tableLength; i++, index += 5) {
+            isoTable[i] = isoCountryTable.substring(index + 2, index + 5);
+        }
+        return Set.of(isoTable);
+    }
 
     private LocaleISOData() {
     }

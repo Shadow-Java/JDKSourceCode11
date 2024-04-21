@@ -1,33 +1,34 @@
 /*
- * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1997, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
 
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.net.URL;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import sun.security.util.Debug;
 
@@ -38,6 +39,7 @@ import sun.security.util.Debug;
  *
  * @author  Li Gong
  * @author  Roland Schemers
+ * @since 1.2
  */
 public class SecureClassLoader extends ClassLoader {
     /*
@@ -47,12 +49,17 @@ public class SecureClassLoader extends ClassLoader {
      */
     private final boolean initialized;
 
-    // HashMap that maps CodeSource to ProtectionDomain
-    // @GuardedBy("pdcache")
-    private final HashMap<CodeSource, ProtectionDomain> pdcache =
-                        new HashMap<>(11);
-
-    private static final Debug debug = Debug.getInstance("scl");
+    /*
+     * Map that maps the CodeSource to a ProtectionDomain. The key is a
+     * CodeSourceKey class that uses a String instead of a URL to avoid
+     * potential expensive name service lookups. This does mean that URLs that
+     * are equivalent after nameservice lookup will be placed in separate
+     * ProtectionDomains; however during policy enforcement these URLs will be
+     * canonicalized and resolved resulting in a consistent set of granted
+     * permissions.
+     */
+    private final Map<CodeSourceKey, ProtectionDomain> pdcache
+            = new ConcurrentHashMap<>(11);
 
     static {
         ClassLoader.registerAsParallelCapable();
@@ -65,7 +72,7 @@ public class SecureClassLoader extends ClassLoader {
      * <p>If there is a security manager, this method first
      * calls the security manager's {@code checkCreateClassLoader}
      * method  to ensure creation of a class loader is allowed.
-     * <p>
+     *
      * @param parent the parent ClassLoader
      * @exception  SecurityException  if a security manager exists and its
      *             {@code checkCreateClassLoader} method doesn't allow
@@ -106,13 +113,38 @@ public class SecureClassLoader extends ClassLoader {
     }
 
     /**
+     * Creates a new {@code SecureClassLoader} of the specified name and
+     * using the specified parent class loader for delegation.
+     *
+     * @param name class loader name; or {@code null} if not named
+     * @param parent the parent class loader
+     *
+     * @throws IllegalArgumentException if the given name is empty.
+     *
+     * @throws SecurityException  if a security manager exists and its
+     *         {@link SecurityManager#checkCreateClassLoader()} method
+     *         doesn't allow creation of a class loader.
+     *
+     * @since 9
+     * @spec JPMS
+     */
+    protected SecureClassLoader(String name, ClassLoader parent) {
+        super(name, parent);
+        SecurityManager security = System.getSecurityManager();
+        if (security != null) {
+            security.checkCreateClassLoader();
+        }
+        initialized = true;
+    }
+
+    /**
      * Converts an array of bytes into an instance of class Class,
      * with an optional CodeSource. Before the
      * class can be used it must be resolved.
      * <p>
      * If a non-null CodeSource is supplied a ProtectionDomain is
      * constructed and associated with the class being defined.
-     * <p>
+     *
      * @param      name the expected name of the class, or {@code null}
      *                  if not known, using '.' and not '/' as the separator
      *                  and without a trailing ".class" suffix.
@@ -149,7 +181,7 @@ public class SecureClassLoader extends ClassLoader {
      * <p>
      * If a non-null CodeSource is supplied a ProtectionDomain is
      * constructed and associated with the class being defined.
-     * <p>
+     *
      * @param      name the expected name of the class, or {@code null}
      *                  if not known, using '.' and not '/' as the separator
      *                  and without a trailing ".class" suffix.
@@ -180,7 +212,7 @@ public class SecureClassLoader extends ClassLoader {
      * This method is invoked by the defineClass method which takes
      * a CodeSource as an argument when it is constructing the
      * ProtectionDomain for the class being defined.
-     * <p>
+     *
      * @param codesource the codesource.
      *
      * @return the permissions granted to the codesource.
@@ -193,26 +225,39 @@ public class SecureClassLoader extends ClassLoader {
     }
 
     /*
+     * holder class for the static field "debug" to delay its initialization
+     */
+    private static class DebugHolder {
+        private static final Debug debug = Debug.getInstance("scl");
+    }
+
+    /*
      * Returned cached ProtectionDomain for the specified CodeSource.
      */
     private ProtectionDomain getProtectionDomain(CodeSource cs) {
-        if (cs == null)
+        if (cs == null) {
             return null;
-
-        ProtectionDomain pd = null;
-        synchronized (pdcache) {
-            pd = pdcache.get(cs);
-            if (pd == null) {
-                PermissionCollection perms = getPermissions(cs);
-                pd = new ProtectionDomain(cs, perms, this, null);
-                pdcache.put(cs, pd);
-                if (debug != null) {
-                    debug.println(" getPermissions "+ pd);
-                    debug.println("");
-                }
-            }
         }
-        return pd;
+
+        // Use a CodeSourceKey object key. It should behave in the
+        // same manner as the CodeSource when compared for equality except
+        // that no nameservice lookup is done on the hostname (String comparison
+        // only), and the fragment is not considered.
+        CodeSourceKey key = new CodeSourceKey(cs);
+        return pdcache.computeIfAbsent(key, new Function<>() {
+            @Override
+            public ProtectionDomain apply(CodeSourceKey key /* not used */) {
+                PermissionCollection perms
+                        = SecureClassLoader.this.getPermissions(cs);
+                ProtectionDomain pd = new ProtectionDomain(
+                        cs, perms, SecureClassLoader.this, null);
+                if (DebugHolder.debug != null) {
+                    DebugHolder.debug.println(" getPermissions " + pd);
+                    DebugHolder.debug.println("");
+                }
+                return pd;
+            }
+        });
     }
 
     /*
@@ -224,4 +269,37 @@ public class SecureClassLoader extends ClassLoader {
         }
     }
 
+    private static class CodeSourceKey {
+        private final CodeSource cs;
+
+        CodeSourceKey(CodeSource cs) {
+            this.cs = cs;
+        }
+
+        @Override
+        public int hashCode() {
+            String locationNoFrag = cs.getLocationNoFragString();
+            return locationNoFrag != null ? locationNoFrag.hashCode() : 0;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+
+            if (!(obj instanceof CodeSourceKey)) {
+                return false;
+            }
+
+            CodeSourceKey csk = (CodeSourceKey) obj;
+
+            if (!Objects.equals(cs.getLocationNoFragString(),
+                                csk.cs.getLocationNoFragString())) {
+                return false;
+            }
+
+            return cs.matchCerts(csk.cs, true);
+        }
+    }
 }

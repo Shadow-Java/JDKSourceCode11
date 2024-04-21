@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security.acl;
@@ -68,11 +68,7 @@ import java.security.Principal;
  *
  * The {@code  java.security.acl } package provides the
  * interfaces to the ACL and related data structures (ACL entries,
- * groups, permissions, etc.), and the {@code  sun.security.acl }
- * classes provide a default implementation of the interfaces. For
- * example, {@code  java.security.acl.Acl } provides the
- * interface to an ACL and the {@code  sun.security.acl.AclImpl }
- * class provides the default implementation of the interface.<p>
+ * groups, permissions, etc.).<p>
  *
  * The {@code  java.security.acl.Acl } interface extends the
  * {@code  java.security.acl.Owner } interface. The Owner
@@ -86,8 +82,15 @@ import java.security.Principal;
  * @see java.security.acl.Acl#getPermissions
  *
  * @author Satish Dharmaraj
+ * @since 1.1
+ *
+ * @deprecated This class is deprecated and subject to removal in a future
+ *     version of Java SE. It has been replaced by {@code java.security.Policy}
+ *     and related classes since 1.2.
  */
 
+@Deprecated(since="9", forRemoval=true)
+@SuppressWarnings("removal")
 public interface Acl extends Owner {
 
     /**

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2007, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.file;
@@ -168,10 +168,10 @@ class FileTreeWalker implements Closeable {
      * @throws  IllegalArgumentException
      *          if {@code maxDepth} is negative
      * @throws  ClassCastException
-     *          if (@code options} contains an element that is not a
+     *          if {@code options} contains an element that is not a
      *          {@code FileVisitOption}
      * @throws  NullPointerException
-     *          if {@code options} is {@ocde null} or the options
+     *          if {@code options} is {@code null} or the options
      *          array contains a {@code null} element
      */
     FileTreeWalker(Collection<FileVisitOption> options, int maxDepth) {
@@ -353,12 +353,13 @@ class FileTreeWalker implements Closeable {
                 }
             }
 
-            // no next entry so close and pop directory, creating corresponding event
+            // no next entry so close and pop directory,
+            // creating corresponding event
             if (entry == null) {
                 try {
                     top.stream().close();
                 } catch (IOException e) {
-                    if (ioe != null) {
+                    if (ioe == null) {
                         ioe = e;
                     } else {
                         ioe.addSuppressed(e);

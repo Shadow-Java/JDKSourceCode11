@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio;
@@ -39,15 +39,19 @@ class StringCharBuffer                                  // package-private
         if ((start < 0) || (start > n) || (end < start) || (end > n))
             throw new IndexOutOfBoundsException();
         str = s;
+        this.isReadOnly = true;
     }
 
     public CharBuffer slice() {
+        int pos = this.position();
+        int lim = this.limit();
+        int rem = (pos <= lim ? lim - pos : 0);
         return new StringCharBuffer(str,
                                     -1,
                                     0,
-                                    this.remaining(),
-                                    this.remaining(),
-                                    offset + this.position());
+                                    rem,
+                                    rem,
+                                    offset + pos);
     }
 
     private StringCharBuffer(CharSequence s,
@@ -58,6 +62,7 @@ class StringCharBuffer                                  // package-private
                              int offset) {
         super(mark, pos, limit, cap, null, offset);
         str = s;
+        this.isReadOnly = true;
     }
 
     public CharBuffer duplicate() {
@@ -100,7 +105,7 @@ class StringCharBuffer                                  // package-private
     }
 
     final String toString(int start, int end) {
-        return str.toString().substring(start + offset, end + offset);
+        return str.subSequence(start + offset, end + offset).toString();
     }
 
     public final CharBuffer subSequence(int start, int end) {
@@ -125,4 +130,41 @@ class StringCharBuffer                                  // package-private
         return ByteOrder.nativeOrder();
     }
 
+    ByteOrder charRegionOrder() {
+        return null;
+    }
+
+    public boolean equals(Object ob) {
+        if (this == ob)
+            return true;
+        if (!(ob instanceof CharBuffer))
+            return false;
+        CharBuffer that = (CharBuffer)ob;
+        int thisPos = this.position();
+        int thisRem = this.limit() - thisPos;
+        int thatPos = that.position();
+        int thatRem = that.limit() - thatPos;
+        if (thisRem < 0 || thisRem != thatRem)
+            return false;
+        return BufferMismatch.mismatch(this, thisPos,
+                                       that, thatPos,
+                                       thisRem) < 0;
+    }
+
+    public int compareTo(CharBuffer that) {
+        int thisPos = this.position();
+        int thisRem = this.limit() - thisPos;
+        int thatPos = that.position();
+        int thatRem = that.limit() - thatPos;
+        int length = Math.min(thisRem, thatRem);
+        if (length < 0)
+            return -1;
+        int i = BufferMismatch.mismatch(this, thisPos,
+                                        that, thatPos,
+                                        length);
+        if (i >= 0) {
+            return Character.compare(this.get(thisPos + i), that.get(thatPos + i));
+        }
+        return thisRem - thatRem;
+    }
 }

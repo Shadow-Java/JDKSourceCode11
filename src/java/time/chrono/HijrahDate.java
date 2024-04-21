@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
@@ -105,7 +105,7 @@ import java.time.temporal.ValueRange;
  * to a new HijrahChronology.
  *
  * <p>
- * This is a <a href="{@docRoot}/java/lang/doc-files/ValueBased.html">value-based</a>
+ * This is a <a href="{@docRoot}/java.base/java/lang/doc-files/ValueBased.html">value-based</a>
  * class; use of identity-sensitive operations (including reference equality
  * ({@code ==}), identity hash code, or synchronization) on instances of
  * {@code HijrahDate} may have unpredictable results and should be avoided.
@@ -368,7 +368,7 @@ public final class HijrahDate
         if (field instanceof ChronoField) {
             switch ((ChronoField) field) {
                 case DAY_OF_WEEK: return getDayOfWeek();
-                case ALIGNED_DAY_OF_WEEK_IN_MONTH: return ((getDayOfWeek() - 1) % 7) + 1;
+                case ALIGNED_DAY_OF_WEEK_IN_MONTH: return ((dayOfMonth - 1) % 7) + 1;
                 case ALIGNED_DAY_OF_WEEK_IN_YEAR: return ((getDayOfYear() - 1) % 7) + 1;
                 case DAY_OF_MONTH: return this.dayOfMonth;
                 case DAY_OF_YEAR: return this.getDayOfYear();
@@ -497,7 +497,7 @@ public final class HijrahDate
      * @return the day-of-week; computed from the epochday
      */
     private int getDayOfWeek() {
-        int dow0 = (int)Math.floorMod(toEpochDay() + 3, 7);
+        int dow0 = Math.floorMod(toEpochDay() + 3, 7);
         return dow0 + 1;
     }
 

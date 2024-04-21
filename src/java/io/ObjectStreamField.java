@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.io;
 
 import java.lang.reflect.Field;
-import sun.reflect.CallerSensitive;
-import sun.reflect.Reflection;
+import jdk.internal.reflect.CallerSensitive;
+import jdk.internal.reflect.Reflection;
 import sun.reflect.misc.ReflectUtil;
 
 /**
@@ -45,16 +45,18 @@ public class ObjectStreamField
 
     /** field name */
     private final String name;
-    /** canonical JVM signature of field type */
+    /** canonical JVM signature of field type, if given */
     private final String signature;
     /** field type (Object.class if unknown non-primitive type) */
     private final Class<?> type;
+    /** lazily constructed signature for the type, if no explicit signature */
+    private String typeSignature;
     /** whether or not to (de)serialize field values as unshared */
     private final boolean unshared;
     /** corresponding reflective field object, if any */
     private final Field field;
     /** offset of field value in enclosing field group */
-    private int offset = 0;
+    private int offset;
 
     /**
      * Create a Serializable field with the specified type.  This field should
@@ -91,8 +93,8 @@ public class ObjectStreamField
         this.name = name;
         this.type = type;
         this.unshared = unshared;
-        signature = getClassSignature(type).intern();
-        field = null;
+        this.field = null;
+        this.signature = null;
     }
 
     /**
@@ -106,7 +108,7 @@ public class ObjectStreamField
         this.name = name;
         this.signature = signature.intern();
         this.unshared = unshared;
-        field = null;
+        this.field = null;
 
         switch (signature.charAt(0)) {
             case 'Z': type = Boolean.TYPE; break;
@@ -121,6 +123,58 @@ public class ObjectStreamField
             case '[': type = Object.class; break;
             default: throw new IllegalArgumentException("illegal signature");
         }
+    }
+
+    /**
+     * Returns JVM type signature for given primitive.
+     */
+    private static String getPrimitiveSignature(Class<?> cl) {
+        if (cl == Integer.TYPE)
+            return "I";
+        else if (cl == Byte.TYPE)
+            return "B";
+        else if (cl == Long.TYPE)
+            return "J";
+        else if (cl == Float.TYPE)
+            return "F";
+        else if (cl == Double.TYPE)
+            return "D";
+        else if (cl == Short.TYPE)
+            return "S";
+        else if (cl == Character.TYPE)
+            return "C";
+        else if (cl == Boolean.TYPE)
+            return "Z";
+        else if (cl == Void.TYPE)
+            return "V";
+        else
+            throw new InternalError();
+    }
+
+    /**
+     * Returns JVM type signature for given class.
+     */
+    static String getClassSignature(Class<?> cl) {
+        if (cl.isPrimitive()) {
+            return getPrimitiveSignature(cl);
+        } else {
+            return appendClassSignature(new StringBuilder(), cl).toString();
+        }
+    }
+
+    static StringBuilder appendClassSignature(StringBuilder sbuf, Class<?> cl) {
+        while (cl.isArray()) {
+            sbuf.append('[');
+            cl = cl.getComponentType();
+        }
+
+        if (cl.isPrimitive()) {
+            sbuf.append(getPrimitiveSignature(cl));
+        } else {
+            sbuf.append('L').append(cl.getName().replace('.', '/')).append(';');
+        }
+
+        return sbuf;
     }
 
     /**
@@ -190,7 +244,7 @@ public class ObjectStreamField
      */
     // REMIND: deprecate?
     public char getTypeCode() {
-        return signature.charAt(0);
+        return getSignature().charAt(0);
     }
 
     /**
@@ -200,7 +254,7 @@ public class ObjectStreamField
      */
     // REMIND: deprecate?
     public String getTypeString() {
-        return isPrimitive() ? null : signature;
+        return isPrimitive() ? null : getSignature();
     }
 
     /**
@@ -232,7 +286,7 @@ public class ObjectStreamField
      */
     // REMIND: deprecate?
     public boolean isPrimitive() {
-        char tcode = signature.charAt(0);
+        char tcode = getTypeCode();
         return ((tcode != 'L') && (tcode != '['));
     }
 
@@ -268,7 +322,7 @@ public class ObjectStreamField
      * Return a string that describes this field.
      */
     public String toString() {
-        return signature + ' ' + name;
+        return getSignature() + ' ' + name;
     }
 
     /**
@@ -284,43 +338,17 @@ public class ObjectStreamField
      * that signature strings are returned for primitive fields as well).
      */
     String getSignature() {
-        return signature;
-    }
+        if (signature != null) {
+            return signature;
+        }
 
-    /**
-     * Returns JVM type signature for given class.
-     */
-    private static String getClassSignature(Class<?> cl) {
-        StringBuilder sbuf = new StringBuilder();
-        while (cl.isArray()) {
-            sbuf.append('[');
-            cl = cl.getComponentType();
+        String sig = typeSignature;
+        // This lazy calculation is safe since signature can be null iff one
+        // of the public constructors are used, in which case type is always
+        // initialized to the exact type we want the signature to represent.
+        if (sig == null) {
+            typeSignature = sig = getClassSignature(type).intern();
         }
-        if (cl.isPrimitive()) {
-            if (cl == Integer.TYPE) {
-                sbuf.append('I');
-            } else if (cl == Byte.TYPE) {
-                sbuf.append('B');
-            } else if (cl == Long.TYPE) {
-                sbuf.append('J');
-            } else if (cl == Float.TYPE) {
-                sbuf.append('F');
-            } else if (cl == Double.TYPE) {
-                sbuf.append('D');
-            } else if (cl == Short.TYPE) {
-                sbuf.append('S');
-            } else if (cl == Character.TYPE) {
-                sbuf.append('C');
-            } else if (cl == Boolean.TYPE) {
-                sbuf.append('Z');
-            } else if (cl == Void.TYPE) {
-                sbuf.append('V');
-            } else {
-                throw new InternalError();
-            }
-        } else {
-            sbuf.append('L' + cl.getName().replace('.', '/') + ';');
-        }
-        return sbuf.toString();
+        return sig;
     }
 }

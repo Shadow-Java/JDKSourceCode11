@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.invoke;
@@ -61,7 +61,13 @@ import java.util.Arrays;
  *     parameters</em>, which must be provided as arguments to the
  *     {@code CallSite} target, and which may be early-bound to the behavior
  *     {@code MethodHandle}.  The number of captured parameters and their types
- *     are determined during linkage.</li>
+ *     are determined during linkage.
+ *     The identity of a function object produced by invoking the
+ *     {@code CallSite}'s target is unpredictable, and therefore
+ *     identity-sensitive operations (such as reference equality, object
+ *     locking, and {@code System.identityHashCode()} may produce different
+ *     results in different implementations, or even upon different invocations
+ *     in the same implementation.</li>
  *
  *     <li><em>Invocation</em> occurs when an implemented interface method
  *     is invoked on a function object.  This may occur many times for a single
@@ -149,20 +155,24 @@ import java.util.Arrays;
  * capture argument (corresponding to the receiver) must be non-null.
  *
  * <p>A type Q is considered adaptable to S as follows:
- * <table summary="adaptable types">
- *     <tr><th>Q</th><th>S</th><th>Link-time checks</th><th>Invocation-time checks</th></tr>
+ * <table class="striped">
+ *   <caption style="display:none">adaptable types</caption>
+ *   <thead>
+ *     <tr><th scope="col">Q</th><th scope="col">S</th><th scope="col">Link-time checks</th><th scope="col">Invocation-time checks</th></tr>
+ *   </thead>
+ *   <tbody>
  *     <tr>
- *         <td>Primitive</td><td>Primitive</td>
+ *         <th scope="row">Primitive</th><th scope="row">Primitive</th>
  *         <td>Q can be converted to S via a primitive widening conversion</td>
  *         <td>None</td>
  *     </tr>
  *     <tr>
- *         <td>Primitive</td><td>Reference</td>
+ *         <th scope="row">Primitive</th><th scope="row">Reference</th>
  *         <td>S is a supertype of the Wrapper(Q)</td>
  *         <td>Cast from Wrapper(Q) to S</td>
  *     </tr>
  *     <tr>
- *         <td>Reference</td><td>Primitive</td>
+ *         <th scope="row">Reference</th><th scope="row">Primitive</th>
  *         <td>for parameter types: Q is a primitive wrapper and Primitive(Q)
  *         can be widened to S
  *         <br>for return types: If Q is a primitive wrapper, check that
@@ -171,11 +181,12 @@ import java.util.Arrays;
  *         for example Number for numeric types</td>
  *     </tr>
  *     <tr>
- *         <td>Reference</td><td>Reference</td>
+ *         <th scope="row">Reference</th><th scope="row">Reference</th>
  *         <td>for parameter types: S is a supertype of Q
  *         <br>for return types: none</td>
  *         <td>Cast from Q to S</td>
  *     </tr>
+ *   </tbody>
  * </table>
  *
  * @apiNote These linkage methods are designed to support the evaluation
@@ -211,8 +222,11 @@ import java.util.Arrays;
  * theory, any method handle could be used. Currently supported are direct method
  * handles representing invocation of virtual, interface, constructor and static
  * methods.
+ * @since 1.8
  */
-public class LambdaMetafactory {
+public final class LambdaMetafactory {
+
+    private LambdaMetafactory() {}
 
     /** Flag for alternate metafactories indicating the lambda object
      * must be serializable */
@@ -233,6 +247,12 @@ public class LambdaMetafactory {
 
     private static final Class<?>[] EMPTY_CLASS_ARRAY = new Class<?>[0];
     private static final MethodType[] EMPTY_MT_ARRAY = new MethodType[0];
+
+    // LambdaMetafactory bootstrap methods are startup sensitive, and may be
+    // special cased in java.lang.invokeBootstrapMethodInvoker to ensure
+    // methods are invoked with exact type information to avoid generating
+    // code for runtime checks. Take care any changes or additions here are
+    // reflected there as appropriate.
 
     /**
      * Facilitates the creation of simple "function objects" that implement one
@@ -255,8 +275,12 @@ public class LambdaMetafactory {
      * methods from {@code Object}.
      *
      * @param caller Represents a lookup context with the accessibility
-     *               privileges of the caller.  When used with {@code invokedynamic},
-     *               this is stacked automatically by the VM.
+     *               privileges of the caller.  Specifically, the lookup context
+     *               must have
+     *               <a href="MethodHandles.Lookup.html#privacc">private access</a>
+     *               privileges.
+     *               When used with {@code invokedynamic}, this is stacked
+     *               automatically by the VM.
      * @param invokedName The name of the method to implement.  When used with
      *                    {@code invokedynamic}, this is provided by the
      *                    {@code NameAndType} of the {@code InvokeDynamic}
@@ -286,7 +310,8 @@ public class LambdaMetafactory {
      *         instances of the interface named by {@code invokedType}
      * @throws LambdaConversionException If any of the linkage invariants
      *                                   described {@link LambdaMetafactory above}
-     *                                   are violated
+     *                                   are violated, or the lookup context
+     *                                   does not have private access privileges.
      */
     public static CallSite metafactory(MethodHandles.Lookup caller,
                                        String invokedName,
@@ -396,8 +421,12 @@ public class LambdaMetafactory {
      * </ul>
      *
      * @param caller Represents a lookup context with the accessibility
-     *               privileges of the caller.  When used with {@code invokedynamic},
-     *               this is stacked automatically by the VM.
+     *               privileges of the caller.  Specifically, the lookup context
+     *               must have
+     *               <a href="MethodHandles.Lookup.html#privacc">private access</a>
+     *               privileges.
+     *               When used with {@code invokedynamic}, this is stacked
+     *               automatically by the VM.
      * @param invokedName The name of the method to implement.  When used with
      *                    {@code invokedynamic}, this is provided by the
      *                    {@code NameAndType} of the {@code InvokeDynamic}
@@ -421,7 +450,8 @@ public class LambdaMetafactory {
      *         instances of the interface named by {@code invokedType}
      * @throws LambdaConversionException If any of the linkage invariants
      *                                   described {@link LambdaMetafactory above}
-     *                                   are violated
+     *                                   are violated, or the lookup context
+     *                                   does not have private access privileges.
      */
     public static CallSite altMetafactory(MethodHandles.Lookup caller,
                                           String invokedName,

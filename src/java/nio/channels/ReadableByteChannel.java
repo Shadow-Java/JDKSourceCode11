@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 2000, 2001, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.channels;
@@ -52,16 +52,16 @@ public interface ReadableByteChannel extends Channel {
      *
      * <p> An attempt is made to read up to <i>r</i> bytes from the channel,
      * where <i>r</i> is the number of bytes remaining in the buffer, that is,
-     * <tt>dst.remaining()</tt>, at the moment this method is invoked.
+     * {@code dst.remaining()}, at the moment this method is invoked.
      *
      * <p> Suppose that a byte sequence of length <i>n</i> is read, where
-     * <tt>0</tt>&nbsp;<tt>&lt;=</tt>&nbsp;<i>n</i>&nbsp;<tt>&lt;=</tt>&nbsp;<i>r</i>.
+     * {@code 0}&nbsp;{@code <=}&nbsp;<i>n</i>&nbsp;{@code <=}&nbsp;<i>r</i>.
      * This byte sequence will be transferred into the buffer so that the first
      * byte in the sequence is at index <i>p</i> and the last byte is at index
-     * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>&nbsp;<tt>-</tt>&nbsp;<tt>1</tt>,
+     * <i>p</i>&nbsp;{@code +}&nbsp;<i>n</i>&nbsp;{@code -}&nbsp;{@code 1},
      * where <i>p</i> is the buffer's position at the moment this method is
      * invoked.  Upon return the buffer's position will be equal to
-     * <i>p</i>&nbsp;<tt>+</tt>&nbsp;<i>n</i>; its limit will not have changed.
+     * <i>p</i>&nbsp;{@code +}&nbsp;<i>n</i>; its limit will not have changed.
      *
      * <p> A read operation might not fill the buffer, and in fact it might not
      * read any bytes at all.  Whether or not it does so depends upon the
@@ -81,7 +81,7 @@ public interface ReadableByteChannel extends Channel {
      * @param  dst
      *         The buffer into which bytes are to be transferred
      *
-     * @return  The number of bytes read, possibly zero, or <tt>-1</tt> if the
+     * @return  The number of bytes read, possibly zero, or {@code -1} if the
      *          channel has reached end-of-stream
      *
      * @throws  NonReadableChannelException

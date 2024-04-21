@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1995, 2016, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1995, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -28,8 +28,15 @@ package java.net;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.PrivilegedAction;
 import java.util.Hashtable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
 import java.util.StringTokenizer;
 import java.util.Collections;
 import java.util.Map;
@@ -38,31 +45,22 @@ import java.security.Permission;
 import java.security.AccessController;
 import sun.security.util.SecurityConstants;
 import sun.net.www.MessageHeader;
+import sun.security.action.GetPropertyAction;
 
 /**
  * The abstract class {@code URLConnection} is the superclass
  * of all classes that represent a communications link between the
  * application and a URL. Instances of this class can be used both to
- * read from and to write to the resource referenced by the URL. In
- * general, creating a connection to a URL is a multistep process:
+ * read from and to write to the resource referenced by the URL.
  *
- * <center><table border=2 summary="Describes the process of creating a connection to a URL: openConnection() and connect() over time.">
- * <tr><th>{@code openConnection()}</th>
- *     <th>{@code connect()}</th></tr>
- * <tr><td>Manipulate parameters that affect the connection to the remote
- *         resource.</td>
- *     <td>Interact with the resource; query header fields and
- *         contents.</td></tr>
- * </table>
- * ----------------------------&gt;
- * <br>time</center>
- *
+ * <p>
+ * In general, creating a connection to a URL is a multistep process:
  * <ol>
  * <li>The connection object is created by invoking the
- *     {@code openConnection} method on a URL.
+ *     {@link URL#openConnection() openConnection} method on a URL.
  * <li>The setup parameters and general request properties are manipulated.
  * <li>The actual connection to the remote object is made, using the
- *    {@code connect} method.
+ *    {@link #connect() connect} method.
  * <li>The remote object becomes available. The header fields and the contents
  *     of the remote object can be accessed.
  * </ol>
@@ -107,7 +105,7 @@ import sun.net.www.MessageHeader;
  *   <li>{@code getContentType}
  *   <li>{@code getDate}
  *   <li>{@code getExpiration}
- *   <li>{@code getLastModifed}
+ *   <li>{@code getLastModified}
  * </ul>
  * <p>
  * provide convenient access to these fields. The
@@ -155,7 +153,7 @@ import sun.net.www.MessageHeader;
  * @see     java.net.URLConnection#setIfModifiedSince(long)
  * @see     java.net.URLConnection#setRequestProperty(java.lang.String, java.lang.String)
  * @see     java.net.URLConnection#setUseCaches(boolean)
- * @since   JDK1.0
+ * @since   1.0
  */
 public abstract class URLConnection {
 
@@ -225,7 +223,7 @@ public abstract class URLConnection {
      */
     protected boolean allowUserInteraction = defaultAllowUserInteraction;
 
-    private static boolean defaultUseCaches = true;
+    private static volatile boolean defaultUseCaches = true;
 
    /**
      * If {@code true}, the protocol is allowed to use caching
@@ -237,12 +235,18 @@ public abstract class URLConnection {
      * <p>
      * Its default value is the value given in the last invocation of the
      * {@code setDefaultUseCaches} method.
+     * <p>
+     * The default setting may be overridden per protocol with
+     * {@link #setDefaultUseCaches(String,boolean)}.
      *
      * @see     java.net.URLConnection#setUseCaches(boolean)
      * @see     java.net.URLConnection#getUseCaches()
      * @see     java.net.URLConnection#setDefaultUseCaches(boolean)
      */
-    protected boolean useCaches = defaultUseCaches;
+    protected boolean useCaches;
+
+    private static final ConcurrentHashMap<String,Boolean> defaultCaching =
+        new ConcurrentHashMap<>();
 
    /**
      * Some protocols support skipping the fetching of the object unless
@@ -283,14 +287,9 @@ public abstract class URLConnection {
     private MessageHeader requests;
 
    /**
-    * @since   JDK1.1
+    * @since   1.1
     */
-    private static FileNameMap fileNameMap;
-
-    /**
-     * @since 1.2.2
-     */
-    private static boolean fileNameMapLoaded = false;
+    private static volatile FileNameMap fileNameMap;
 
     /**
      * Loads filename map (a mimetable) from a data file. It will
@@ -302,18 +301,21 @@ public abstract class URLConnection {
      * @since 1.2
      * @see #setFileNameMap(java.net.FileNameMap)
      */
-    public static synchronized FileNameMap getFileNameMap() {
-        if ((fileNameMap == null) && !fileNameMapLoaded) {
-            fileNameMap = sun.net.www.MimeTable.loadTable();
-            fileNameMapLoaded = true;
+    public static FileNameMap getFileNameMap() {
+        FileNameMap map = fileNameMap;
+
+        if (map == null) {
+            fileNameMap = map = new FileNameMap() {
+                private FileNameMap internalMap =
+                    sun.net.www.MimeTable.loadTable();
+
+                public String getContentTypeFor(String fileName) {
+                    return internalMap.getContentTypeFor(fileName);
+                }
+            };
         }
 
-        return new FileNameMap() {
-            private FileNameMap map = fileNameMap;
-            public String getContentTypeFor(String fileName) {
-                return map.getContentTypeFor(fileName);
-            }
-        };
+        return map;
     }
 
     /**
@@ -361,7 +363,7 @@ public abstract class URLConnection {
      * @see #getConnectTimeout()
      * @see #setConnectTimeout(int)
      */
-    abstract public void connect() throws IOException;
+    public abstract void connect() throws IOException;
 
     /**
      * Sets a specified timeout value, in milliseconds, to be used
@@ -456,6 +458,11 @@ public abstract class URLConnection {
      */
     protected URLConnection(URL url) {
         this.url = url;
+        if (url == null) {
+            this.useCaches = defaultUseCaches;
+        } else {
+            this.useCaches = getDefaultUseCaches(url.getProtocol());
+        }
     }
 
     /**
@@ -495,7 +502,7 @@ public abstract class URLConnection {
      * @return  the content length of the resource that this connection's URL
      *          references, or {@code -1} if the content length is
      *          not known.
-     * @since 7.0
+     * @since 1.7
      */
     public long getContentLengthLong() {
         return getHeaderFieldLong("content-length", -1);
@@ -623,7 +630,7 @@ public abstract class URLConnection {
      * @return  the value of the named field, parsed as a long. The
      *          {@code Default} value is returned if the field is
      *          missing or malformed.
-     * @since 7.0
+     * @since 1.7
      */
     public long getHeaderFieldLong(String name, long Default) {
         String value = getHeaderField(name);
@@ -695,30 +702,33 @@ public abstract class URLConnection {
      * This method first determines the content type of the object by
      * calling the {@code getContentType} method. If this is
      * the first time that the application has seen that specific content
-     * type, a content handler for that content type is created:
+     * type, a content handler for that content type is created.
+     * <p> This is done as follows:
      * <ol>
      * <li>If the application has set up a content handler factory instance
      *     using the {@code setContentHandlerFactory} method, the
      *     {@code createContentHandler} method of that instance is called
      *     with the content type as an argument; the result is a content
      *     handler for that content type.
-     * <li>If no content handler factory has yet been set up, or if the
-     *     factory's {@code createContentHandler} method returns
-     *     {@code null}, then the application loads the class named:
-     *     <blockquote><pre>
-     *         sun.net.www.content.&lt;<i>contentType</i>&gt;
-     *     </pre></blockquote>
-     *     where &lt;<i>contentType</i>&gt; is formed by taking the
-     *     content-type string, replacing all slash characters with a
-     *     {@code period} ('.'), and all other non-alphanumeric characters
-     *     with the underscore character '{@code _}'. The alphanumeric
-     *     characters are specifically the 26 uppercase ASCII letters
-     *     '{@code A}' through '{@code Z}', the 26 lowercase ASCII
-     *     letters '{@code a}' through '{@code z}', and the 10 ASCII
-     *     digits '{@code 0}' through '{@code 9}'. If the specified
-     *     class does not exist, or is not a subclass of
-     *     {@code ContentHandler}, then an
-     *     {@code UnknownServiceException} is thrown.
+     * <li>If no {@code ContentHandlerFactory} has yet been set up,
+     *     or if the factory's {@code createContentHandler} method
+     *     returns {@code null}, then the {@linkplain java.util.ServiceLoader
+     *     ServiceLoader} mechanism is used to locate {@linkplain
+     *     java.net.ContentHandlerFactory ContentHandlerFactory}
+     *     implementations using the system class
+     *     loader. The order that factories are located is implementation
+     *     specific, and an implementation is free to cache the located
+     *     factories. A {@linkplain java.util.ServiceConfigurationError
+     *     ServiceConfigurationError}, {@code Error} or {@code RuntimeException}
+     *     thrown from the {@code createContentHandler}, if encountered, will
+     *     be propagated to the calling thread. The {@code
+     *     createContentHandler} method of each factory, if instantiated, is
+     *     invoked, with the content type, until a factory returns non-null,
+     *     or all factories have been exhausted.
+     * <li>Failing that, this method tries to load a content handler
+     *     class as defined by {@link java.net.ContentHandler ContentHandler}.
+     *     If the class does not exist, or is not a subclass of {@code
+     *     ContentHandler}, then an {@code UnknownServiceException} is thrown.
      * </ol>
      *
      * @return     the object fetched. The {@code instanceof} operator
@@ -760,7 +770,7 @@ public abstract class URLConnection {
      * @see        java.net.URLConnection#setContentHandlerFactory(java.net.ContentHandlerFactory)
      * @since 1.3
      */
-    public Object getContent(Class[] classes) throws IOException {
+    public Object getContent(Class<?>[] classes) throws IOException {
         // Must call getInputStream before GetHeaderField gets called
         // so that FileNotFoundException has a chance to be thrown up
         // from here without being caught.
@@ -775,7 +785,7 @@ public abstract class URLConnection {
      * required to make the connection. By default, this method
      * returns {@code java.security.AllPermission}. Subclasses
      * should override this method and return the permission
-     * that best represents the permission required to make a
+     * that best represents the permission required to make
      * a connection to the URL. For example, a {@code URLConnection}
      * representing a {@code file:} URL would return a
      * {@code java.io.FilePermission} object.
@@ -856,7 +866,7 @@ public abstract class URLConnection {
      * Sets the value of the {@code doInput} field for this
      * {@code URLConnection} to the specified value.
      * <p>
-     * A URL connection can be used for input and/or output.  Set the DoInput
+     * A URL connection can be used for input and/or output.  Set the doInput
      * flag to true if you intend to use the URL connection for input,
      * false if not.  The default is true.
      *
@@ -866,8 +876,7 @@ public abstract class URLConnection {
      * @see #getDoInput()
      */
     public void setDoInput(boolean doinput) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         doInput = doinput;
     }
 
@@ -887,7 +896,7 @@ public abstract class URLConnection {
      * Sets the value of the {@code doOutput} field for this
      * {@code URLConnection} to the specified value.
      * <p>
-     * A URL connection can be used for input and/or output.  Set the DoOutput
+     * A URL connection can be used for input and/or output.  Set the doOutput
      * flag to true if you intend to use the URL connection for output,
      * false if not.  The default is false.
      *
@@ -896,8 +905,7 @@ public abstract class URLConnection {
      * @see #getDoOutput()
      */
     public void setDoOutput(boolean dooutput) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         doOutput = dooutput;
     }
 
@@ -922,8 +930,7 @@ public abstract class URLConnection {
      * @see     #getAllowUserInteraction()
      */
     public void setAllowUserInteraction(boolean allowuserinteraction) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         allowUserInteraction = allowuserinteraction;
     }
 
@@ -955,7 +962,7 @@ public abstract class URLConnection {
      * Returns the default value of the {@code allowUserInteraction}
      * field.
      * <p>
-     * Ths default is "sticky", being a part of the static state of all
+     * This default is "sticky", being a part of the static state of all
      * URLConnections.  This flag applies to the next, and all following
      * URLConnections that are created.
      *
@@ -976,8 +983,9 @@ public abstract class URLConnection {
      * "reload" button in a browser).  If the UseCaches flag on a connection
      * is true, the connection is allowed to use whatever caches it can.
      *  If false, caches are to be ignored.
-     *  The default value comes from DefaultUseCaches, which defaults to
-     * true.
+     *  The default value comes from defaultUseCaches, which defaults to
+     * true. A default value can also be set per-protocol using
+     * {@link #setDefaultUseCaches(String,boolean)}.
      *
      * @param usecaches a {@code boolean} indicating whether
      * or not to allow caching
@@ -985,8 +993,7 @@ public abstract class URLConnection {
      * @see #getUseCaches()
      */
     public void setUseCaches(boolean usecaches) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         useCaches = usecaches;
     }
 
@@ -1011,8 +1018,7 @@ public abstract class URLConnection {
      * @see     #getIfModifiedSince()
      */
     public void setIfModifiedSince(long ifmodifiedsince) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         ifModifiedSince = ifmodifiedsince;
     }
 
@@ -1030,9 +1036,10 @@ public abstract class URLConnection {
      * Returns the default value of a {@code URLConnection}'s
      * {@code useCaches} flag.
      * <p>
-     * Ths default is "sticky", being a part of the static state of all
+     * This default is "sticky", being a part of the static state of all
      * URLConnections.  This flag applies to the next, and all following
-     * URLConnections that are created.
+     * URLConnections that are created. This default value can be over-ridden
+     * per protocol using {@link #setDefaultUseCaches(String,boolean)}
      *
      * @return  the default value of a {@code URLConnection}'s
      *          {@code useCaches} flag.
@@ -1044,13 +1051,51 @@ public abstract class URLConnection {
 
    /**
      * Sets the default value of the {@code useCaches} field to the
-     * specified value.
+     * specified value. This default value can be over-ridden
+     * per protocol using {@link #setDefaultUseCaches(String,boolean)}
      *
      * @param   defaultusecaches   the new value.
      * @see     #getDefaultUseCaches()
      */
     public void setDefaultUseCaches(boolean defaultusecaches) {
         defaultUseCaches = defaultusecaches;
+    }
+
+   /**
+     * Sets the default value of the {@code useCaches} field for the named
+     * protocol to the given value. This value overrides any default setting
+     * set by {@link #setDefaultUseCaches(boolean)} for the given protocol.
+     * Successive calls to this method change the setting and affect the
+     * default value for all future connections of that protocol. The protocol
+     * name is case insensitive.
+     *
+     * @param   protocol the protocol to set the default for
+     * @param   defaultVal whether caching is enabled by default for the given protocol
+     * @since 9
+     */
+    public static void setDefaultUseCaches(String protocol, boolean defaultVal) {
+        protocol = protocol.toLowerCase(Locale.US);
+        defaultCaching.put(protocol, defaultVal);
+    }
+
+   /**
+     * Returns the default value of the {@code useCaches} flag for the given protocol. If
+     * {@link #setDefaultUseCaches(String,boolean)} was called for the given protocol,
+     * then that value is returned. Otherwise, if {@link #setDefaultUseCaches(boolean)}
+     * was called, then that value is returned. If neither method was called,
+     * the return value is {@code true}. The protocol name is case insensitive.
+     *
+     * @param protocol the protocol whose defaultUseCaches setting is required
+     * @return  the default value of the {@code useCaches} flag for the given protocol.
+     * @since 9
+     */
+    public static boolean getDefaultUseCaches(String protocol) {
+        Boolean protoDefault = defaultCaching.get(protocol.toLowerCase(Locale.US));
+        if (protoDefault != null) {
+            return protoDefault.booleanValue();
+        } else {
+            return defaultUseCaches;
+        }
     }
 
     /**
@@ -1066,12 +1111,11 @@ public abstract class URLConnection {
      *                  (e.g., "{@code Accept}").
      * @param   value   the value associated with it.
      * @throws IllegalStateException if already connected
-     * @throws NullPointerException if key is <CODE>null</CODE>
+     * @throws NullPointerException if key is {@code null}
      * @see #getRequestProperty(java.lang.String)
      */
     public void setRequestProperty(String key, String value) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         if (key == null)
             throw new NullPointerException ("key is null");
 
@@ -1095,8 +1139,7 @@ public abstract class URLConnection {
      * @since 1.4
      */
     public void addRequestProperty(String key, String value) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
         if (key == null)
             throw new NullPointerException ("key is null");
 
@@ -1118,8 +1161,7 @@ public abstract class URLConnection {
      * @see #setRequestProperty(java.lang.String, java.lang.String)
      */
     public String getRequestProperty(String key) {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
 
         if (requests == null)
             return null;
@@ -1140,8 +1182,7 @@ public abstract class URLConnection {
      * @since 1.4
      */
     public Map<String,List<String>> getRequestProperties() {
-        if (connected)
-            throw new IllegalStateException("Already connected");
+        checkConnected();
 
         if (requests == null)
             return Collections.emptyMap();
@@ -1194,14 +1235,14 @@ public abstract class URLConnection {
     /**
      * The ContentHandler factory.
      */
-    static ContentHandlerFactory factory;
+    private static volatile ContentHandlerFactory factory;
 
     /**
      * Sets the {@code ContentHandlerFactory} of an
      * application. It can be called at most once by an application.
      * <p>
      * The {@code ContentHandlerFactory} instance is used to
-     * construct a content handler from a content type
+     * construct a content handler from a content type.
      * <p>
      * If there is a security manager, this method first calls
      * the security manager's {@code checkSetFactory} method
@@ -1227,37 +1268,45 @@ public abstract class URLConnection {
         factory = fac;
     }
 
-    private static Hashtable<String, ContentHandler> handlers = new Hashtable<>();
+    private static final Hashtable<String, ContentHandler> handlers = new Hashtable<>();
 
     /**
      * Gets the Content Handler appropriate for this connection.
      */
-    synchronized ContentHandler getContentHandler()
-        throws UnknownServiceException
-    {
+    private ContentHandler getContentHandler() throws UnknownServiceException {
         String contentType = stripOffParameters(getContentType());
-        ContentHandler handler = null;
-        if (contentType == null)
+        if (contentType == null) {
             throw new UnknownServiceException("no content-type");
-        try {
-            handler = handlers.get(contentType);
-            if (handler != null)
-                return handler;
-        } catch(Exception e) {
         }
 
-        if (factory != null)
+        ContentHandler handler = handlers.get(contentType);
+        if (handler != null)
+            return handler;
+
+        if (factory != null) {
             handler = factory.createContentHandler(contentType);
-        if (handler == null) {
-            try {
-                handler = lookupContentHandlerClassFor(contentType);
-            } catch(Exception e) {
-                e.printStackTrace();
-                handler = UnknownContentHandler.INSTANCE;
-            }
-            handlers.put(contentType, handler);
+            if (handler != null)
+                return handler;
         }
-        return handler;
+
+        handler = lookupContentHandlerViaProvider(contentType);
+
+        if (handler != null) {
+            ContentHandler h = handlers.putIfAbsent(contentType, handler);
+            return Objects.requireNonNullElse(h, handler);
+        }
+
+        try {
+            handler = lookupContentHandlerClassFor(contentType);
+        } catch (Exception e) {
+            e.printStackTrace();
+            handler = UnknownContentHandler.INSTANCE;
+        }
+
+        assert handler != null;
+
+        ContentHandler h = handlers.putIfAbsent(contentType, handler);
+        return Objects.requireNonNullElse(h, handler);
     }
 
     /*
@@ -1281,10 +1330,10 @@ public abstract class URLConnection {
     private static final String contentPathProp = "java.content.handler.pkgs";
 
     /**
-     * Looks for a content handler in a user-defineable set of places.
-     * By default it looks in sun.net.www.content, but users can define a
-     * vertical-bar delimited set of class prefixes to search through in
-     * addition by defining the java.content.handler.pkgs property.
+     * Looks for a content handler in a user-definable set of places.
+     * By default it looks in {@value #contentClassPrefix}, but users can define
+     * a vertical-bar delimited set of class prefixes to search through in
+     * addition by defining the {@value #contentPathProp} property.
      * The class name must be of the form:
      * <pre>
      *     {package-prefix}.{major}.{minor}
@@ -1292,11 +1341,10 @@ public abstract class URLConnection {
      *     YoyoDyne.experimental.text.plain
      * </pre>
      */
-    private ContentHandler lookupContentHandlerClassFor(String contentType)
-        throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+    private ContentHandler lookupContentHandlerClassFor(String contentType) {
         String contentHandlerClassName = typeToPackageName(contentType);
 
-        String contentHandlerPkgPrefixes =getContentHandlerPkgPrefixes();
+        String contentHandlerPkgPrefixes = getContentHandlerPkgPrefixes();
 
         StringTokenizer packagePrefixIter =
             new StringTokenizer(contentHandlerPkgPrefixes, "|");
@@ -1316,15 +1364,46 @@ public abstract class URLConnection {
                     }
                 }
                 if (cls != null) {
-                    ContentHandler handler =
-                        (ContentHandler)cls.newInstance();
-                    return handler;
+                    @SuppressWarnings("deprecation")
+                    Object tmp = cls.newInstance();
+                    return (ContentHandler) tmp;
                 }
-            } catch(Exception e) {
-            }
+            } catch(Exception ignored) { }
         }
 
         return UnknownContentHandler.INSTANCE;
+    }
+
+    private ContentHandler lookupContentHandlerViaProvider(String contentType) {
+        return AccessController.doPrivileged(
+                new PrivilegedAction<>() {
+                    @Override
+                    public ContentHandler run() {
+                        ClassLoader cl = ClassLoader.getSystemClassLoader();
+                        ServiceLoader<ContentHandlerFactory> sl =
+                                ServiceLoader.load(ContentHandlerFactory.class, cl);
+
+                        Iterator<ContentHandlerFactory> iterator = sl.iterator();
+
+                        ContentHandler handler = null;
+                        while (iterator.hasNext()) {
+                            ContentHandlerFactory f;
+                            try {
+                                f = iterator.next();
+                            } catch (ServiceConfigurationError e) {
+                                if (e.getCause() instanceof SecurityException) {
+                                    continue;
+                                }
+                                throw e;
+                            }
+                            handler = f.createContentHandler(contentType);
+                            if (handler != null) {
+                                break;
+                            }
+                        }
+                        return handler;
+                    }
+                });
     }
 
     /**
@@ -1356,12 +1435,12 @@ public abstract class URLConnection {
      * Returns a vertical bar separated list of package prefixes for potential
      * content handlers.  Tries to get the java.content.handler.pkgs property
      * to use as a set of package prefixes to search.  Whether or not
-     * that property has been defined, the sun.net.www.content is always
-     * the last one on the returned package list.
+     * that property has been defined, the {@value #contentClassPrefix}
+     * is always the last one on the returned package list.
      */
     private String getContentHandlerPkgPrefixes() {
-        String packagePrefixList = AccessController.doPrivileged(
-            new sun.security.action.GetPropertyAction(contentPathProp, ""));
+        String packagePrefixList =
+                GetPropertyAction.privilegedGetProperty(contentPathProp, "");
 
         if (packagePrefixList != "") {
             packagePrefixList += "|";
@@ -1406,7 +1485,7 @@ public abstract class URLConnection {
      * @see        java.io.InputStream#markSupported()
      * @see        java.net.URLConnection#getContentType()
      */
-    static public String guessContentTypeFromStream(InputStream is)
+    public static String guessContentTypeFromStream(InputStream is)
                         throws IOException {
         // If we can't read ahead safely, just give up on guessing
         if (!is.markSupported())
@@ -1532,6 +1611,11 @@ public abstract class URLConnection {
             }
         }
 
+        if ((c1 == 0x49 && c2 == 0x49 && c3 == 0x2a && c4 == 0x00)
+            || (c1 == 0x4d && c2 == 0x4d && c3 == 0x00 && c4 == 0x2a)) {
+            return "image/tiff";
+        }
+
         if (c1 == 0xD0 && c2 == 0xCF && c3 == 0x11 && c4 == 0xE0 &&
             c5 == 0xA1 && c6 == 0xB1 && c7 == 0x1A && c8 == 0xE1) {
 
@@ -1567,7 +1651,7 @@ public abstract class URLConnection {
      * method, the stream should have already been checked to be sure it
      * contains Microsoft Structured Storage data.
      */
-    static private boolean checkfpx(InputStream is) throws IOException {
+    private static boolean checkfpx(InputStream is) throws IOException {
 
         /* Test for FlashPix image data in Microsoft Structured Storage format.
          * In general, should do this with calls to an SS implementation.
@@ -1728,7 +1812,7 @@ public abstract class URLConnection {
      * Returns -1, If EOF is reached before len bytes are read, returns 0
      * otherwise
      */
-    static private int readBytes(int c[], int len, InputStream is)
+    private static int readBytes(int c[], int len, InputStream is)
                 throws IOException {
 
         byte buf[] = new byte[len];
@@ -1749,7 +1833,7 @@ public abstract class URLConnection {
      * until either EOF is reached, or the specified
      * number of bytes have been skipped
      */
-    static private long skipForward(InputStream is, long toSkip)
+    private static long skipForward(InputStream is, long toSkip)
                 throws IOException {
 
         long eachSkip = 0;
@@ -1771,8 +1855,11 @@ public abstract class URLConnection {
         return skipped;
     }
 
+    private void checkConnected() {
+        if (connected)
+            throw new IllegalStateException("Already connected");
+    }
 }
-
 
 class UnknownContentHandler extends ContentHandler {
     static final ContentHandler INSTANCE = new UnknownContentHandler();

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2003, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2003, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -50,9 +50,24 @@ public abstract class AuthProvider extends Provider {
      * @param name the provider name.
      * @param version the provider version number.
      * @param info a description of the provider and its services.
+     * @deprecated use {@link #AuthProvider(String, String, String)} instead.
      */
+    @Deprecated(since="9")
     protected AuthProvider(String name, double version, String info) {
-        super(name, version, info);
+        super(name, Double.toString(version), info);
+    }
+
+    /**
+     * Constructs a provider with the specified name, version string,
+     * and information.
+     *
+     * @param name the provider name.
+     * @param versionStr the provider version string.
+     * @param info a description of the provider and its services.
+     * @since 9
+     */
+    protected AuthProvider(String name, String versionStr, String info) {
+        super(name, versionStr, info);
     }
 
     /**
@@ -79,8 +94,10 @@ public abstract class AuthProvider extends Provider {
      *          this provider to obtain authentication information
      *          from the caller, which may be {@code null}
      *
-     * @exception LoginException if the login operation fails
-     * @exception SecurityException if the caller does not pass a
+     * @throws IllegalStateException if the provider requires configuration
+     * and {@link configure} has not been called
+     * @throws LoginException if the login operation fails
+     * @throws SecurityException if the caller does not pass a
      *  security check for
      *  {@code SecurityPermission("authProvider.name")},
      *  where {@code name} is the value returned by
@@ -92,8 +109,10 @@ public abstract class AuthProvider extends Provider {
     /**
      * Log out from this provider.
      *
-     * @exception LoginException if the logout operation fails
-     * @exception SecurityException if the caller does not pass a
+     * @throws IllegalStateException if the provider requires configuration
+     * and {@link configure} has not been called
+     * @throws LoginException if the logout operation fails
+     * @throws SecurityException if the caller does not pass a
      *  security check for
      *  {@code SecurityPermission("authProvider.name")},
      *  where {@code name} is the value returned by
@@ -118,7 +137,9 @@ public abstract class AuthProvider extends Provider {
      * @param handler a {@code CallbackHandler} for obtaining
      *          authentication information, which may be {@code null}
      *
-     * @exception SecurityException if the caller does not pass a
+     * @throws IllegalStateException if the provider requires configuration
+     * and {@link configure} has not been called
+     * @throws SecurityException if the caller does not pass a
      *  security check for
      *  {@code SecurityPermission("authProvider.name")},
      *  where {@code name} is the value returned by

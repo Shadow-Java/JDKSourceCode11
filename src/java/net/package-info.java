@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1998, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /**
@@ -121,7 +121,8 @@
  *            underlying protocol handlers like http or https.</li>
  *       <li>{@link java.net.HttpURLConnection} is a subclass of URLConnection
  *            and provides some additional functionalities specific to the
- *            HTTP protocol.</li>
+ *            HTTP protocol. This API has been superseded by the newer
+ *            {@linkplain java.net.http HTTP Client API}.</li>
  * </ul>
  * <p>The recommended usage is to use {@link java.net.URI} to identify
  *    resources, then convert it into a {@link java.net.URL} when it is time to
@@ -143,19 +144,17 @@
  * a similar URL will try to instantiate the handler for the specified protocol;
  * if it doesn't exist an exception will be thrown.
  * <p>By default the protocol handlers are loaded dynamically from the default
- *    location. It is, however, possible to add to the search path by setting
- *    the {@code java.protocol.handler.pkgs} system property. For instance if
- *    it is set to {@code myapp.protocols}, then the URL code will try, in the
- *    case of http, first to load {@code myapp.protocols.http.Handler}, then,
- *    if this fails, {@code http.Handler} from the default location.
- * <p>Note that the Handler class <b>has to</b> be a subclass of the abstract
- *    class {@link java.net.URLStreamHandler}.</p>
+ *    location. It is, however, possible to deploy additional protocols handlers
+ *    as {@link java.util.ServiceLoader services}. Service providers of type
+ *    {@linkplain java.net.spi.URLStreamHandlerProvider} are located at
+ *    runtime, as specified in the {@linkplain
+ *    java.net.URL#URL(String,String,int,String) URL constructor}.
  * <h2>Additional Specification</h2>
  * <ul>
  *       <li><a href="doc-files/net-properties.html">
  *            Networking System Properties</a></li>
  * </ul>
  *
- * @since JDK1.0
+ * @since 1.0
  */
 package java.net;

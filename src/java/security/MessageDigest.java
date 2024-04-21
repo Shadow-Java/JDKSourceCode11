@@ -1,41 +1,39 @@
 /*
- * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2020, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
 
 import java.util.*;
-import java.lang.*;
-import java.io.IOException;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.io.InputStream;
-import java.io.ByteArrayInputStream;
-
 import java.nio.ByteBuffer;
 
 import sun.security.util.Debug;
+import sun.security.util.MessageDigestSpi2;
+
+import javax.crypto.SecretKey;
 
 /**
  * This MessageDigest class provides applications the functionality of a
@@ -91,13 +89,14 @@ import sun.security.util.Debug;
  * <li>{@code SHA-256}</li>
  * </ul>
  * These algorithms are described in the <a href=
- * "{@docRoot}/../technotes/guides/security/StandardNames.html#MessageDigest">
+ * "{@docRoot}/../specs/security/standard-names.html#messagedigest-algorithms">
  * MessageDigest section</a> of the
- * Java Cryptography Architecture Standard Algorithm Name Documentation.
+ * Java Security Standard Algorithm Names Specification.
  * Consult the release documentation for your implementation to see if any
  * other algorithms are supported.
  *
  * @author Benjamin Renaud
+ * @since 1.1
  *
  * @see DigestInputStream
  * @see DigestOutputStream
@@ -125,8 +124,8 @@ public abstract class MessageDigest extends MessageDigestSpi {
      *
      * @param algorithm the standard name of the digest algorithm.
      * See the MessageDigest section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#MessageDigest">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#messagedigest-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      */
     protected MessageDigest(String algorithm) {
@@ -146,22 +145,34 @@ public abstract class MessageDigest extends MessageDigestSpi {
      * <p> Note that the list of registered providers may be retrieved via
      * the {@link Security#getProviders() Security.getProviders()} method.
      *
+     * @implNote
+     * The JDK Reference Implementation additionally uses the
+     * {@code jdk.security.provider.preferred}
+     * {@link Security#getProperty(String) Security} property to determine
+     * the preferred provider order for the specified algorithm. This
+     * may be different than the order of providers returned by
+     * {@link Security#getProviders() Security.getProviders()}.
+     *
      * @param algorithm the name of the algorithm requested.
      * See the MessageDigest section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#MessageDigest">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#messagedigest-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
-     * @return a Message Digest object that implements the specified algorithm.
+     * @return a {@code MessageDigest} object that implements the
+     *         specified algorithm
      *
-     * @exception NoSuchAlgorithmException if no Provider supports a
-     *          MessageDigestSpi implementation for the
-     *          specified algorithm.
+     * @throws NoSuchAlgorithmException if no {@code Provider} supports a
+     *         {@code MessageDigestSpi} implementation for the
+     *         specified algorithm
+     *
+     * @throws NullPointerException if {@code algorithm} is {@code null}
      *
      * @see Provider
      */
     public static MessageDigest getInstance(String algorithm)
     throws NoSuchAlgorithmException {
+        Objects.requireNonNull(algorithm, "null algorithm name");
         try {
             MessageDigest md;
             Object[] objs = Security.getImpl(algorithm, "MessageDigest",
@@ -199,30 +210,34 @@ public abstract class MessageDigest extends MessageDigestSpi {
      *
      * @param algorithm the name of the algorithm requested.
      * See the MessageDigest section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#MessageDigest">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#messagedigest-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
      * @param provider the name of the provider.
      *
-     * @return a MessageDigest object that implements the specified algorithm.
+     * @return a {@code MessageDigest} object that implements the
+     *         specified algorithm
      *
-     * @exception NoSuchAlgorithmException if a MessageDigestSpi
-     *          implementation for the specified algorithm is not
-     *          available from the specified provider.
+     * @throws IllegalArgumentException if the provider name is {@code null}
+     *         or empty
      *
-     * @exception NoSuchProviderException if the specified provider is not
-     *          registered in the security provider list.
+     * @throws NoSuchAlgorithmException if a {@code MessageDigestSpi}
+     *         implementation for the specified algorithm is not
+     *         available from the specified provider
      *
-     * @exception IllegalArgumentException if the provider name is null
-     *          or empty.
+     * @throws NoSuchProviderException if the specified provider is not
+     *         registered in the security provider list
+     *
+     * @throws NullPointerException if {@code algorithm} is {@code null}
      *
      * @see Provider
      */
     public static MessageDigest getInstance(String algorithm, String provider)
         throws NoSuchAlgorithmException, NoSuchProviderException
     {
-        if (provider == null || provider.length() == 0)
+        Objects.requireNonNull(algorithm, "null algorithm name");
+        if (provider == null || provider.isEmpty())
             throw new IllegalArgumentException("missing provider");
         Object[] objs = Security.getImpl(algorithm, "MessageDigest", provider);
         if (objs[0] instanceof MessageDigest) {
@@ -248,19 +263,23 @@ public abstract class MessageDigest extends MessageDigestSpi {
      *
      * @param algorithm the name of the algorithm requested.
      * See the MessageDigest section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#MessageDigest">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#messagedigest-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
      * @param provider the provider.
      *
-     * @return a MessageDigest object that implements the specified algorithm.
+     * @return a {@code MessageDigest} object that implements the
+     *         specified algorithm
      *
-     * @exception NoSuchAlgorithmException if a MessageDigestSpi
-     *          implementation for the specified algorithm is not available
-     *          from the specified Provider object.
+     * @throws IllegalArgumentException if the specified provider is
+     *         {@code null}
      *
-     * @exception IllegalArgumentException if the specified provider is null.
+     * @throws NoSuchAlgorithmException if a {@code MessageDigestSpi}
+     *         implementation for the specified algorithm is not available
+     *         from the specified {@code Provider} object
+     *
+     * @throws NullPointerException if {@code algorithm} is {@code null}
      *
      * @see Provider
      *
@@ -270,6 +289,7 @@ public abstract class MessageDigest extends MessageDigestSpi {
                                             Provider provider)
         throws NoSuchAlgorithmException
     {
+        Objects.requireNonNull(algorithm, "null algorithm name");
         if (provider == null)
             throw new IllegalArgumentException("missing provider");
         Object[] objs = Security.getImpl(algorithm, "MessageDigest", provider);
@@ -411,13 +431,17 @@ public abstract class MessageDigest extends MessageDigestSpi {
         return digest();
     }
 
+    private String getProviderName() {
+        return (provider == null) ? "(no provider)" : provider.getName();
+    }
+
     /**
      * Returns a string representation of this message digest object.
      */
     public String toString() {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         PrintStream p = new PrintStream(baos);
-        p.print(algorithm+" Message Digest from "+provider.getName()+", ");
+        p.print(algorithm+" Message Digest from "+getProviderName()+", ");
         switch (state) {
         case INITIAL:
             p.print("<initialized>");
@@ -431,7 +455,14 @@ public abstract class MessageDigest extends MessageDigestSpi {
     }
 
     /**
-     * Compares two digests for equality. Does a simple byte compare.
+     * Compares two digests for equality. Two digests are equal if they have
+     * the same length and all bytes at corresponding positions are equal.
+     *
+     * @implNote
+     * All bytes in {@code digesta} are examined to determine equality.
+     * The calculation time depends only on the length of {@code digesta}.
+     * It does not depend on the length of {@code digestb} or the contents
+     * of {@code digesta} and {@code digestb}.
      *
      * @param digesta one of the digests to compare.
      *
@@ -444,14 +475,22 @@ public abstract class MessageDigest extends MessageDigestSpi {
         if (digesta == null || digestb == null) {
             return false;
         }
-        if (digesta.length != digestb.length) {
-            return false;
+
+        int lenA = digesta.length;
+        int lenB = digestb.length;
+
+        if (lenB == 0) {
+            return lenA == 0;
         }
 
         int result = 0;
+        result |= lenA - lenB;
+
         // time-constant comparison
-        for (int i = 0; i < digesta.length; i++) {
-            result |= digesta[i] ^ digestb[i];
+        for (int i = 0; i < lenA; i++) {
+            // If i >= lenB, indexB is 0; otherwise, i.
+            int indexB = ((i - lenB) >>> 31) * i;
+            result |= digesta[i] ^ digestb[indexB];
         }
         return result == 0;
     }
@@ -469,8 +508,8 @@ public abstract class MessageDigest extends MessageDigestSpi {
      * implementation details. The name should be a standard
      * Java Security name (such as "SHA-256").
      * See the MessageDigest section in the <a href=
-     * "{@docRoot}/../technotes/guides/security/StandardNames.html#MessageDigest">
-     * Java Cryptography Architecture Standard Algorithm Name Documentation</a>
+     * "{@docRoot}/../specs/security/standard-names.html#messagedigest-algorithms">
+     * Java Security Standard Algorithm Names Specification</a>
      * for information about standard algorithm names.
      *
      * @return the name of the algorithm
@@ -535,7 +574,7 @@ public abstract class MessageDigest extends MessageDigestSpi {
      * and its original parent (Object).
      */
 
-    static class Delegate extends MessageDigest {
+    static class Delegate extends MessageDigest implements MessageDigestSpi2 {
 
         // The provider implementation (delegate)
         private MessageDigestSpi digestSpi;
@@ -588,6 +627,14 @@ public abstract class MessageDigest extends MessageDigestSpi {
             digestSpi.engineUpdate(input);
         }
 
+        public void engineUpdate(SecretKey key) throws InvalidKeyException {
+            if (digestSpi instanceof MessageDigestSpi2) {
+                ((MessageDigestSpi2)digestSpi).engineUpdate(key);
+            } else {
+                throw new UnsupportedOperationException
+                ("Digest does not support update of SecretKey object");
+            }
+        }
         protected byte[] engineDigest() {
             return digestSpi.engineDigest();
         }

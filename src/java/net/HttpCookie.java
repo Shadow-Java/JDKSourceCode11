@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2005, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -35,6 +35,8 @@ import java.util.GregorianCalendar;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Objects;
+import jdk.internal.misc.JavaNetHttpCookieAccess;
+import jdk.internal.misc.SharedSecrets;
 
 /**
  * An HttpCookie object represents an HTTP cookie, which carries state
@@ -74,7 +76,7 @@ public final class HttpCookie implements Cloneable {
     private boolean httpOnly;   // HttpOnly ... i.e. not accessible to scripts
     private int version = 1;    // Version=1 ... RFC 2965 style
 
-    // The original header this cookie was consructed from, if it was
+    // The original header this cookie was constructed from, if it was
     // constructed by parsing a header, otherwise null.
     private final String header;
 
@@ -84,11 +86,11 @@ public final class HttpCookie implements Cloneable {
 
     // Since the positive and zero max-age have their meanings,
     // this value serves as a hint as 'not specify max-age'
-    private final static long MAX_AGE_UNSPECIFIED = -1;
+    private static final long MAX_AGE_UNSPECIFIED = -1;
 
     // date formats used by Netscape's cookie draft
     // as well as formats seen on various sites
-    private final static String[] COOKIE_DATE_FORMATS = {
+    private static final String[] COOKIE_DATE_FORMATS = {
         "EEE',' dd-MMM-yyyy HH:mm:ss 'GMT'",
         "EEE',' dd MMM yyyy HH:mm:ss 'GMT'",
         "EEE MMM dd yyyy HH:mm:ss 'GMT'Z",
@@ -98,8 +100,8 @@ public final class HttpCookie implements Cloneable {
     };
 
     // constant strings represent set-cookie header token
-    private final static String SET_COOKIE = "set-cookie:";
-    private final static String SET_COOKIE2 = "set-cookie2:";
+    private static final String SET_COOKIE = "set-cookie:";
+    private static final String SET_COOKIE2 = "set-cookie2:";
 
     // ---------------- Ctors --------------
 
@@ -141,7 +143,7 @@ public final class HttpCookie implements Cloneable {
 
     private HttpCookie(String name, String value, String header) {
         name = name.trim();
-        if (name.length() == 0 || !isToken(name) || name.charAt(0) == '$') {
+        if (name.isEmpty() || !isToken(name) || name.charAt(0) == '$') {
             throw new IllegalArgumentException("Illegal cookie name");
         }
 
@@ -231,7 +233,7 @@ public final class HttpCookie implements Cloneable {
         // if not specify max-age, this cookie should be
         // discarded when user agent is to be closed, but
         // it is not expired.
-        if (maxAge == MAX_AGE_UNSPECIFIED) return false;
+        if (maxAge < 0) return false;
 
         long deltaSecond = (System.currentTimeMillis() - whenCreated) / 1000;
         if (deltaSecond > maxAge)
@@ -950,7 +952,8 @@ public final class HttpCookie implements Cloneable {
                                    String attrName,
                                    String attrValue) {
                     if (cookie.getMaxAge() == MAX_AGE_UNSPECIFIED) {
-                        cookie.setMaxAge(cookie.expiryDate2DeltaSeconds(attrValue));
+                        long delta = cookie.expiryDate2DeltaSeconds(attrValue);
+                        cookie.setMaxAge(delta > 0 ? delta : 0);
                     }
                 }
             });
@@ -971,8 +974,8 @@ public final class HttpCookie implements Cloneable {
     }
 
     static {
-        sun.misc.SharedSecrets.setJavaNetHttpCookieAccess(
-            new sun.misc.JavaNetHttpCookieAccess() {
+        SharedSecrets.setJavaNetHttpCookieAccess(
+            new JavaNetHttpCookieAccess() {
                 public List<HttpCookie> parse(String header) {
                     return HttpCookie.parse(header, true);
                 }
@@ -985,7 +988,7 @@ public final class HttpCookie implements Cloneable {
     }
 
     /*
-     * Returns the original header this cookie was consructed from, if it was
+     * Returns the original header this cookie was constructed from, if it was
      * constructed by parsing a header, otherwise null.
      */
     private String header() {
@@ -1125,7 +1128,7 @@ public final class HttpCookie implements Cloneable {
      * @return  list of strings; never null
      */
     private static List<String> splitMultiCookies(String header) {
-        List<String> cookies = new java.util.ArrayList<String>();
+        List<String> cookies = new java.util.ArrayList<>();
         int quoteCount = 0;
         int p, q;
 

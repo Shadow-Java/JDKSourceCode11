@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -34,14 +34,16 @@
  */
 
 package java.util.concurrent;
-import java.util.*;
+
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 
 /**
  * A {@link ConcurrentMap} supporting {@link NavigableMap} operations,
  * and recursively so for its navigable sub-maps.
  *
  * <p>This interface is a member of the
- * <a href="{@docRoot}/../technotes/guides/collections/index.html">
+ * <a href="{@docRoot}/java.base/java/util/package-summary.html#CollectionsFramework">
  * Java Collections Framework</a>.
  *
  * @author Doug Lea
@@ -101,7 +103,7 @@ public interface ConcurrentNavigableMap<K,V>
      * reflected in the descending map, and vice-versa.
      *
      * <p>The returned map has an ordering equivalent to
-     * {@link Collections#reverseOrder(Comparator) Collections.reverseOrder}{@code (comparator())}.
+     * {@link java.util.Collections#reverseOrder(Comparator) Collections.reverseOrder}{@code (comparator())}.
      * The expression {@code m.descendingMap().descendingMap()} returns a
      * view of {@code m} essentially equivalent to {@code m}.
      *
@@ -125,7 +127,7 @@ public interface ConcurrentNavigableMap<K,V>
      *
      * @return a navigable set view of the keys in this map
      */
-    public NavigableSet<K> navigableKeySet();
+    NavigableSet<K> navigableKeySet();
 
     /**
      * Returns a {@link NavigableSet} view of the keys contained in this map.
@@ -163,5 +165,5 @@ public interface ConcurrentNavigableMap<K,V>
      *
      * @return a reverse order navigable set view of the keys in this map
      */
-    public NavigableSet<K> descendingKeySet();
+    NavigableSet<K> descendingKeySet();
 }

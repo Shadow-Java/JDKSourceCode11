@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1997, 2003, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.ref;
@@ -42,7 +42,7 @@ package java.lang.ref;
  *
  * <p> All soft references to softly-reachable objects are guaranteed to have
  * been cleared before the virtual machine throws an
- * <code>OutOfMemoryError</code>.  Otherwise no constraints are placed upon the
+ * {@code OutOfMemoryError}.  Otherwise no constraints are placed upon the
  * time at which a soft reference will be cleared or the order in which a set
  * of such references to different objects will be cleared.  Virtual machine
  * implementations are, however, encouraged to bias against clearing
@@ -66,7 +66,7 @@ public class SoftReference<T> extends Reference<T> {
     /**
      * Timestamp clock, updated by the garbage collector
      */
-    static private long clock;
+    private static long clock;
 
     /**
      * Timestamp updated by each invocation of the get method.  The VM may use
@@ -92,7 +92,7 @@ public class SoftReference<T> extends Reference<T> {
      *
      * @param referent object the new soft reference will refer to
      * @param q the queue with which the reference is to be registered,
-     *          or <tt>null</tt> if registration is not required
+     *          or {@code null} if registration is not required
      *
      */
     public SoftReference(T referent, ReferenceQueue<? super T> q) {
@@ -103,10 +103,10 @@ public class SoftReference<T> extends Reference<T> {
     /**
      * Returns this reference object's referent.  If this reference object has
      * been cleared, either by the program or by the garbage collector, then
-     * this method returns <code>null</code>.
+     * this method returns {@code null}.
      *
      * @return   The object to which this reference refers, or
-     *           <code>null</code> if this reference object has been cleared
+     *           {@code null} if this reference object has been cleared
      */
     public T get() {
         T o = super.get();

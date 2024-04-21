@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.reflect;
@@ -28,6 +28,9 @@ package java.lang.reflect;
 import java.lang.annotation.*;
 import java.util.Map;
 import java.util.Objects;
+import java.util.StringJoiner;
+
+import jdk.internal.misc.SharedSecrets;
 import sun.reflect.annotation.AnnotationParser;
 import sun.reflect.annotation.AnnotationSupport;
 import sun.reflect.annotation.TypeAnnotationParser;
@@ -53,11 +56,6 @@ public abstract class Executable extends AccessibleObject
     abstract byte[] getAnnotationBytes();
 
     /**
-     * Accessor method to allow code sharing
-     */
-    abstract Executable getRoot();
-
-    /**
      * Does the Executable have generic information.
      */
     abstract boolean hasGenericInformation();
@@ -79,18 +77,9 @@ public abstract class Executable extends AccessibleObject
     Annotation[][] parseParameterAnnotations(byte[] parameterAnnotations) {
         return AnnotationParser.parseParameterAnnotations(
                parameterAnnotations,
-               sun.misc.SharedSecrets.getJavaLangAccess().
+               SharedSecrets.getJavaLangAccess().
                getConstantPool(getDeclaringClass()),
                getDeclaringClass());
-    }
-
-    void separateWithCommas(Class<?>[] types, StringBuilder sb) {
-        for (int j = 0; j < types.length; j++) {
-            sb.append(types[j].getTypeName());
-            if (j < (types.length - 1))
-                sb.append(",");
-        }
-
     }
 
     void printModifiersIfNonzero(StringBuilder sb, int mask, boolean isDefault) {
@@ -119,13 +108,20 @@ public abstract class Executable extends AccessibleObject
 
             printModifiersIfNonzero(sb, modifierMask, isDefault);
             specificToStringHeader(sb);
-
             sb.append('(');
-            separateWithCommas(parameterTypes, sb);
+            StringJoiner sj = new StringJoiner(",");
+            for (Class<?> parameterType : parameterTypes) {
+                sj.add(parameterType.getTypeName());
+            }
+            sb.append(sj.toString());
             sb.append(')');
+
             if (exceptionTypes.length > 0) {
-                sb.append(" throws ");
-                separateWithCommas(exceptionTypes, sb);
+                StringJoiner joiner = new StringJoiner(",", " throws ", "");
+                for (Class<?> exceptionType : exceptionTypes) {
+                    joiner.add(exceptionType.getTypeName());
+                }
+                sb.append(joiner.toString());
             }
             return sb.toString();
         } catch (Exception e) {
@@ -147,42 +143,34 @@ public abstract class Executable extends AccessibleObject
 
             TypeVariable<?>[] typeparms = getTypeParameters();
             if (typeparms.length > 0) {
-                boolean first = true;
-                sb.append('<');
+                StringJoiner sj = new StringJoiner(",", "<", "> ");
                 for(TypeVariable<?> typeparm: typeparms) {
-                    if (!first)
-                        sb.append(',');
-                    // Class objects can't occur here; no need to test
-                    // and call Class.getName().
-                    sb.append(typeparm.toString());
-                    first = false;
+                    sj.add(typeparm.getTypeName());
                 }
-                sb.append("> ");
+                sb.append(sj.toString());
             }
 
             specificToGenericStringHeader(sb);
 
             sb.append('(');
+            StringJoiner sj = new StringJoiner(",");
             Type[] params = getGenericParameterTypes();
             for (int j = 0; j < params.length; j++) {
                 String param = params[j].getTypeName();
                 if (isVarArgs() && (j == params.length - 1)) // replace T[] with T...
                     param = param.replaceFirst("\\[\\]$", "...");
-                sb.append(param);
-                if (j < (params.length - 1))
-                    sb.append(',');
+                sj.add(param);
             }
+            sb.append(sj.toString());
             sb.append(')');
-            Type[] exceptions = getGenericExceptionTypes();
-            if (exceptions.length > 0) {
-                sb.append(" throws ");
-                for (int k = 0; k < exceptions.length; k++) {
-                    sb.append((exceptions[k] instanceof Class)?
-                              ((Class)exceptions[k]).getName():
-                              exceptions[k].toString());
-                    if (k < (exceptions.length - 1))
-                        sb.append(',');
+
+            Type[] exceptionTypes = getGenericExceptionTypes();
+            if (exceptionTypes.length > 0) {
+                StringJoiner joiner = new StringJoiner(",", " throws ", "");
+                for (Type exceptionType : exceptionTypes) {
+                    joiner.add(exceptionType.getTypeName());
                 }
+                sb.append(joiner.toString());
             }
             return sb.toString();
         } catch (Exception e) {
@@ -228,6 +216,14 @@ public abstract class Executable extends AccessibleObject
      *     <cite>The Java&trade; Virtual Machine Specification</cite>
      */
     public abstract TypeVariable<?>[] getTypeParameters();
+
+    // returns shared array of parameter types - must never give it out
+    // to the untrusted code...
+    abstract Class<?>[] getSharedParameterTypes();
+
+    // returns shared array of exception types - must never give it out
+    // to the untrusted code...
+    abstract Class<?>[] getSharedExceptionTypes();
 
     /**
      * Returns an array of {@code Class} objects that represent the formal
@@ -554,12 +550,18 @@ public abstract class Executable extends AccessibleObject
 
         Annotation[][] result = parseParameterAnnotations(parameterAnnotations);
 
-        if (result.length != numParameters)
-            handleParameterNumberMismatch(result.length, numParameters);
+        if (result.length != numParameters &&
+            handleParameterNumberMismatch(result.length, numParameters)) {
+            Annotation[][] tmp = new Annotation[result.length+1][];
+            // Shift annotations down one to account for an implicit leading parameter
+            System.arraycopy(result, 0, tmp, 1, result.length);
+            tmp[0] = new Annotation[0];
+            result = tmp;
+        }
         return result;
     }
 
-    abstract void handleParameterNumberMismatch(int resultLength, int numParameters);
+    abstract boolean handleParameterNumberMismatch(int resultLength, int numParameters);
 
     /**
      * {@inheritDoc}
@@ -588,22 +590,29 @@ public abstract class Executable extends AccessibleObject
         return AnnotationParser.toArray(declaredAnnotations());
     }
 
-    private transient Map<Class<? extends Annotation>, Annotation> declaredAnnotations;
+    private transient volatile Map<Class<? extends Annotation>, Annotation> declaredAnnotations;
 
-    private synchronized  Map<Class<? extends Annotation>, Annotation> declaredAnnotations() {
-        if (declaredAnnotations == null) {
-            Executable root = getRoot();
-            if (root != null) {
-                declaredAnnotations = root.declaredAnnotations();
-            } else {
-                declaredAnnotations = AnnotationParser.parseAnnotations(
-                    getAnnotationBytes(),
-                    sun.misc.SharedSecrets.getJavaLangAccess().
-                    getConstantPool(getDeclaringClass()),
-                    getDeclaringClass());
+    private Map<Class<? extends Annotation>, Annotation> declaredAnnotations() {
+        Map<Class<? extends Annotation>, Annotation> declAnnos;
+        if ((declAnnos = declaredAnnotations) == null) {
+            synchronized (this) {
+                if ((declAnnos = declaredAnnotations) == null) {
+                    Executable root = (Executable)getRoot();
+                    if (root != null) {
+                        declAnnos = root.declaredAnnotations();
+                    } else {
+                        declAnnos = AnnotationParser.parseAnnotations(
+                                getAnnotationBytes(),
+                                SharedSecrets.getJavaLangAccess().
+                                        getConstantPool(getDeclaringClass()),
+                                getDeclaringClass()
+                        );
+                    }
+                    declaredAnnotations = declAnnos;
+                }
             }
         }
-        return declaredAnnotations;
+        return declAnnos;
     }
 
     /**
@@ -631,7 +640,7 @@ public abstract class Executable extends AccessibleObject
      */
     AnnotatedType getAnnotatedReturnType0(Type returnType) {
         return TypeAnnotationParser.buildAnnotatedType(getTypeAnnotationBytes0(),
-                sun.misc.SharedSecrets.getJavaLangAccess().
+                SharedSecrets.getJavaLangAccess().
                         getConstantPool(getDeclaringClass()),
                 this,
                 getDeclaringClass(),
@@ -642,27 +651,30 @@ public abstract class Executable extends AccessibleObject
     /**
      * Returns an {@code AnnotatedType} object that represents the use of a
      * type to specify the receiver type of the method/constructor represented
-     * by this Executable object. The receiver type of a method/constructor is
-     * available only if the method/constructor has a <em>receiver
-     * parameter</em> (JLS 8.4.1).
+     * by this {@code Executable} object.
      *
-     * If this {@code Executable} object represents a constructor or instance
-     * method that does not have a receiver parameter, or has a receiver
-     * parameter with no annotations on its type, then the return value is an
-     * {@code AnnotatedType} object representing an element with no
+     * The receiver type of a method/constructor is available only if the
+     * method/constructor has a receiver parameter (JLS 8.4.1). If this {@code
+     * Executable} object <em>represents an instance method or represents a
+     * constructor of an inner member class</em>, and the
+     * method/constructor <em>either</em> has no receiver parameter or has a
+     * receiver parameter with no annotations on its type, then the return
+     * value is an {@code AnnotatedType} object representing an element with no
      * annotations.
      *
-     * If this {@code Executable} object represents a static method, then the
-     * return value is null.
+     * If this {@code Executable} object represents a static method or
+     * represents a constructor of a top level, static member, local, or
+     * anonymous class, then the return value is null.
      *
      * @return an object representing the receiver type of the method or
-     * constructor represented by this {@code Executable}
+     * constructor represented by this {@code Executable} or {@code null} if
+     * this {@code Executable} can not have a receiver parameter
      */
     public AnnotatedType getAnnotatedReceiverType() {
         if (Modifier.isStatic(this.getModifiers()))
             return null;
         return TypeAnnotationParser.buildAnnotatedType(getTypeAnnotationBytes0(),
-                sun.misc.SharedSecrets.getJavaLangAccess().
+                SharedSecrets.getJavaLangAccess().
                         getConstantPool(getDeclaringClass()),
                 this,
                 getDeclaringClass(),
@@ -686,7 +698,7 @@ public abstract class Executable extends AccessibleObject
      */
     public AnnotatedType[] getAnnotatedParameterTypes() {
         return TypeAnnotationParser.buildAnnotatedTypes(getTypeAnnotationBytes0(),
-                sun.misc.SharedSecrets.getJavaLangAccess().
+                SharedSecrets.getJavaLangAccess().
                         getConstantPool(getDeclaringClass()),
                 this,
                 getDeclaringClass(),
@@ -710,7 +722,7 @@ public abstract class Executable extends AccessibleObject
      */
     public AnnotatedType[] getAnnotatedExceptionTypes() {
         return TypeAnnotationParser.buildAnnotatedTypes(getTypeAnnotationBytes0(),
-                sun.misc.SharedSecrets.getJavaLangAccess().
+                SharedSecrets.getJavaLangAccess().
                         getConstantPool(getDeclaringClass()),
                 this,
                 getDeclaringClass(),

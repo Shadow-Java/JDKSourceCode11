@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1995, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util;
@@ -34,7 +34,7 @@ import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.StreamSupport;
 
-import sun.misc.Unsafe;
+import jdk.internal.misc.Unsafe;
 
 /**
  * An instance of this class is used to generate a stream of
@@ -110,7 +110,7 @@ class Random implements java.io.Serializable {
         // Different Sizes and Good Lattice Structure", 1999
         for (;;) {
             long current = seedUniquifier.get();
-            long next = current * 181783497276652981L;
+            long next = current * 1181783497276652981L;
             if (seedUniquifier.compareAndSet(current, next))
                 return next;
         }
@@ -165,7 +165,7 @@ class Random implements java.io.Serializable {
      *
      * @param seed the initial seed
      */
-    synchronized public void setSeed(long seed) {
+    public synchronized void setSeed(long seed) {
         this.seed.set(initialScramble(seed));
         haveNextNextGaussian = false;
     }
@@ -187,7 +187,7 @@ class Random implements java.io.Serializable {
      *
      * This is a linear congruential pseudorandom number generator, as
      * defined by D. H. Lehmer and described by Donald E. Knuth in
-     * <i>The Art of Computer Programming,</i> Volume 3:
+     * <i>The Art of Computer Programming,</i> Volume 2:
      * <i>Seminumerical Algorithms</i>, section 3.2.1.
      *
      * @param  bits random bits
@@ -570,7 +570,7 @@ class Random implements java.io.Serializable {
      * }}</pre>
      * This uses the <i>polar method</i> of G. E. P. Box, M. E. Muller, and
      * G. Marsaglia, as described by Donald E. Knuth in <i>The Art of
-     * Computer Programming</i>, Volume 3: <i>Seminumerical Algorithms</i>,
+     * Computer Programming</i>, Volume 2: <i>Seminumerical Algorithms</i>,
      * section 3.4.1, subsection C, algorithm P. Note that it generates two
      * independent values at the cost of only one call to {@code StrictMath.log}
      * and one call to {@code StrictMath.sqrt}.
@@ -580,7 +580,7 @@ class Random implements java.io.Serializable {
      *         standard deviation {@code 1.0} from this random number
      *         generator's sequence
      */
-    synchronized public double nextGaussian() {
+    public synchronized double nextGaussian() {
         // See Knuth, ACP, Section 3.4.1 Algorithm C.
         if (haveNextNextGaussian) {
             haveNextNextGaussian = false;
@@ -1197,7 +1197,7 @@ class Random implements java.io.Serializable {
     /**
      * Save the {@code Random} instance to a stream.
      */
-    synchronized private void writeObject(ObjectOutputStream s)
+    private synchronized void writeObject(ObjectOutputStream s)
         throws IOException {
 
         // set the values of the Serializable fields

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2014, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -33,6 +33,7 @@ import java.lang.reflect.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This class represents a "provider" for the
@@ -41,58 +42,76 @@ import java.util.function.Function;
  *
  * <ul>
  *
- * <li>Algorithms (such as DSA, RSA, MD5 or SHA-1).
+ * <li>Algorithms (such as DSA, RSA, or SHA-256).
  *
  * <li>Key generation, conversion, and management facilities (such as for
  * algorithm-specific keys).
  *
- *</ul>
- *
- * <p>Each provider has a name and a version number, and is configured
- * in each runtime it is installed in.
- *
- * <p>See <a href =
- * "../../../technotes/guides/security/crypto/CryptoSpec.html#Provider">The Provider Class</a>
- * in the "Java Cryptography Architecture API Specification &amp; Reference"
- * for information about how a particular type of provider, the
- * cryptographic service provider, works and is installed. However,
- * please note that a provider can be used to implement any security
- * service in Java that uses a pluggable architecture with a choice
- * of implementations that fit underneath.
+ * </ul>
  *
  * <p>Some provider implementations may encounter unrecoverable internal
  * errors during their operation, for example a failure to communicate with a
  * security token. A {@link ProviderException} should be used to indicate
  * such errors.
  *
+ * <p>Please note that a provider can be used to implement any security
+ * service in Java that uses a pluggable architecture with a choice
+ * of implementations that fit underneath.
+ *
  * <p>The service type {@code Provider} is reserved for use by the
  * security framework. Services of this type cannot be added, removed,
  * or modified by applications.
  * The following attributes are automatically placed in each Provider object:
- * <table cellspacing=4>
+ * <table class="striped">
  * <caption><b>Attributes Automatically Placed in a Provider Object</b></caption>
- * <tr><th>Name</th><th>Value</th>
- * <tr><td>{@code Provider.id name}</td>
-  *    <td>{@code String.valueOf(provider.getName())}</td>
- * <tr><td>{@code Provider.id version}</td>
- *     <td>{@code String.valueOf(provider.getVersion())}</td>
- * <tr><td>{@code Provider.id info}</td>
-       <td>{@code String.valueOf(provider.getInfo())}</td>
- * <tr><td>{@code Provider.id className}</td>
+ * <thead>
+ * <tr><th scope="col">Name</th><th scope="col">Value</th>
+ * </thead>
+ * <tbody style="text-align:left">
+ * <tr><th scope="row">{@code Provider.id name}</th>
+ *     <td>{@code String.valueOf(provider.getName())}</td>
+ * <tr><th scope="row">{@code Provider.id version}</th>
+ *     <td>{@code String.valueOf(provider.getVersionStr())}</td>
+ * <tr><th scope="row">{@code Provider.id info}</th>
+ *     <td>{@code String.valueOf(provider.getInfo())}</td>
+ * <tr><th scope="row">{@code Provider.id className}</th>
  *     <td>{@code provider.getClass().getName()}</td>
+ * </tbody>
  * </table>
+ *
+ * <p>Each provider has a name and a version string. A provider normally
+ * identifies itself with a file named {@code java.security.Provider}
+ * in the resource directory {@code META-INF/services}.
+ * Security providers are looked up via the {@link ServiceLoader} mechanism
+ * using the {@link ClassLoader#getSystemClassLoader application class loader}.
+ *
+ * <p>Providers may be configured such that they are automatically
+ * installed and made available at runtime via the
+ * {@link Security#getProviders() Security.getProviders()} method.
+ * The mechanism for configuring and installing security providers is
+ * implementation-specific.
+ *
+ * @implNote
+ * The JDK implementation supports static registration of the security
+ * providers via the {@code conf/security/java.security} file in the Java
+ * installation directory. These providers are automatically installed by
+ * the JDK runtime, see {@extLink security_guide_jca_provider
+ * The Provider Class}
+ * in the Java Cryptography Architecture (JCA) Reference Guide
+ * for information about how a particular type of provider, the cryptographic
+ * service provider, works and is installed.
  *
  * @author Benjamin Renaud
  * @author Andreas Sterbenz
+ * @since 1.1
  */
 public abstract class Provider extends Properties {
 
     // Declare serialVersionUID to be compatible with JDK1.1
-    static final long serialVersionUID = -4298000515446427739L;
+    private static final long serialVersionUID = -4298000515446427739L;
 
     private static final sun.security.util.Debug debug =
-        sun.security.util.Debug.getInstance
-        ("provider", "Provider");
+        sun.security.util.Debug.getInstance("provider", "Provider");
 
     /**
      * The provider name.
@@ -115,29 +134,185 @@ public abstract class Provider extends Properties {
      */
     private double version;
 
+    /**
+     * The provider version string.
+     *
+     * @serial
+     */
+    private String versionStr;
 
     private transient Set<Map.Entry<Object,Object>> entrySet = null;
     private transient int entrySetCallCount = 0;
 
     private transient boolean initialized;
 
+    private static Object newInstanceUtil(final Class<?> clazz,
+        final Class<?> ctrParamClz, final Object ctorParamObj)
+        throws Exception {
+        if (ctrParamClz == null) {
+            Constructor<?> con = clazz.getConstructor();
+            return con.newInstance();
+        } else {
+            // Looking for the constructor with a params first and fallback
+            // to one without if not found. This is to support the enhanced
+            // SecureRandom where both styles of constructors are supported.
+            // Before jdk9, there was no params support (only getInstance(alg))
+            // and an impl only had the params-less constructor. Since jdk9,
+            // there is getInstance(alg,params) and an impl can contain
+            // an Impl(params) constructor.
+            try {
+                Constructor<?> con = clazz.getConstructor(ctrParamClz);
+                return con.newInstance(ctorParamObj);
+            } catch (NoSuchMethodException nsme) {
+                // For pre-jdk9 SecureRandom implementations, they only
+                // have params-less constructors which still works when
+                // the input ctorParamObj is null.
+                //
+                // For other primitives using params, ctorParamObj should not
+                // be null and nsme is thrown, just like before.
+                if (ctorParamObj == null) {
+                    try {
+                        Constructor<?> con = clazz.getConstructor();
+                        return con.newInstance();
+                    } catch (NoSuchMethodException nsme2) {
+                        nsme.addSuppressed(nsme2);
+                        throw nsme;
+                    }
+                } else {
+                    throw nsme;
+                }
+            }
+        }
+    }
+
+    private static double parseVersionStr(String s) {
+        try {
+            int firstDotIdx = s.indexOf('.');
+            int nextDotIdx = s.indexOf('.', firstDotIdx + 1);
+            if (nextDotIdx != -1) {
+                s = s.substring(0, nextDotIdx);
+            }
+            int endIdx = s.indexOf('-');
+            if (endIdx > 0) {
+                s = s.substring(0, endIdx);
+            }
+            endIdx = s.indexOf('+');
+            if (endIdx > 0) {
+                s = s.substring(0, endIdx);
+            }
+            return Double.parseDouble(s);
+        } catch (NullPointerException | NumberFormatException e) {
+            return 0d;
+        }
+    }
+
     /**
      * Constructs a provider with the specified name, version number,
-     * and information.
+     * and information. Calling this constructor is equivalent to call the
+     * {@link #Provider(String, String, String)} with {@code name}
+     * name, {@code Double.toString(version)}, and {@code info}.
      *
      * @param name the provider name.
      *
      * @param version the provider version number.
      *
      * @param info a description of the provider and its services.
+     *
+     * @deprecated use {@link #Provider(String, String, String)} instead.
      */
+    @Deprecated(since="9")
     protected Provider(String name, double version, String info) {
         this.name = name;
         this.version = version;
+        this.versionStr = Double.toString(version);
         this.info = info;
+        this.serviceMap = new ConcurrentHashMap<>();
         putId();
         initialized = true;
     }
+
+    /**
+     * Constructs a provider with the specified name, version string,
+     * and information.
+     *
+     * <p>The version string contains a version number optionally followed
+     * by other information separated by one of the characters of '+', '-'.
+     *
+     * The format for the version number is:
+     *
+     * <blockquote><pre>
+     *     ^[0-9]+(\.[0-9]+)*
+     * </pre></blockquote>
+     *
+     * <p>In order to return the version number in a double, when there are
+     * more than two components (separated by '.' as defined above), only
+     * the first two components are retained. The resulting string is then
+     * passed to {@link Double#valueOf(String)} to generate version number,
+     * i.e. {@link #getVersion}.
+     * <p>If the conversion failed, value 0 will be used.
+     *
+     * @param name the provider name.
+     *
+     * @param versionStr the provider version string.
+     *
+     * @param info a description of the provider and its services.
+     *
+     * @since 9
+     */
+    protected Provider(String name, String versionStr, String info) {
+        this.name = name;
+        this.versionStr = versionStr;
+        this.version = parseVersionStr(versionStr);
+        this.info = info;
+        this.serviceMap = new ConcurrentHashMap<>();
+        putId();
+        initialized = true;
+    }
+
+    /**
+     * Apply the supplied configuration argument to this provider instance
+     * and return the configured provider. Note that if this provider cannot
+     * be configured in-place, a new provider will be created and returned.
+     * Therefore, callers should always use the returned provider.
+     *
+     * @implSpec
+     * The default implementation throws {@code UnsupportedOperationException}.
+     * Subclasses should override this method only if a configuration argument
+     * is supported.
+     *
+     * @param configArg the configuration information for configuring this
+     *         provider.
+     *
+     * @throws UnsupportedOperationException if a configuration argument is
+     *         not supported.
+     * @throws NullPointerException if the supplied configuration argument is
+               null.
+     * @throws InvalidParameterException if the supplied configuration argument
+     *         is invalid.
+     * @return a provider configured with the supplied configuration argument.
+     *
+     * @since 9
+     */
+    public Provider configure(String configArg) {
+        throw new UnsupportedOperationException("configure is not supported");
+    }
+
+    /**
+     * Check if this provider instance has been configured.
+     *
+     * @implSpec
+     * The default implementation returns true.
+     * Subclasses should override this method if the provider instance requires
+     * an explicit {@code configure} call after being constructed.
+     *
+     * @return true if no further configuration is needed, false otherwise.
+     *
+     * @since 9
+     */
+    public boolean isConfigured() {
+        return true;
+    }
+
 
     /**
      * Returns the name of this provider.
@@ -152,9 +327,23 @@ public abstract class Provider extends Properties {
      * Returns the version number for this provider.
      *
      * @return the version number for this provider.
+     *
+     * @deprecated use {@link #getVersionStr} instead.
      */
+    @Deprecated(since="9")
     public double getVersion() {
         return version;
+    }
+
+    /**
+     * Returns the version string for this provider.
+     *
+     * @return the version string for this provider.
+     *
+     * @since 9
+     */
+    public String getVersionStr() {
+        return versionStr;
     }
 
     /**
@@ -168,14 +357,14 @@ public abstract class Provider extends Properties {
     }
 
     /**
-     * Returns a string with the name and the version number
+     * Returns a string with the name and the version string
      * of this provider.
      *
-     * @return the string with the name and the version number
+     * @return the string with the name and the version string
      * for this provider.
      */
     public String toString() {
-        return name + " version " + version;
+        return name + " version " + versionStr;
     }
 
     /*
@@ -212,8 +401,8 @@ public abstract class Provider extends Properties {
     /**
      * Reads a property list (key and element pairs) from the input stream.
      *
-     * @param inStream   the input stream.
-     * @exception  IOException  if an error occurred when reading from the
+     * @param inStream the input stream.
+     * @exception IOException if an error occurred when reading from the
      *               input stream.
      * @see java.util.Properties#load
      */
@@ -471,7 +660,8 @@ public abstract class Provider extends Properties {
      * @since 1.8
      */
     @Override
-    public synchronized void replaceAll(BiFunction<? super Object, ? super Object, ? extends Object> function) {
+    public synchronized void replaceAll(BiFunction<? super Object,
+            ? super Object, ? extends Object> function) {
         check("putProviderProperty." + name);
 
         if (debug != null) {
@@ -499,10 +689,10 @@ public abstract class Provider extends Properties {
      * @since 1.8
      */
     @Override
-    public synchronized Object compute(Object key,
-        BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction) {
+    public synchronized Object compute(Object key, BiFunction<? super Object,
+            ? super Object, ? extends Object> remappingFunction) {
         check("putProviderProperty." + name);
-        check("removeProviderProperty" + name);
+        check("removeProviderProperty." + name);
 
         if (debug != null) {
             debug.println("Compute " + name + " provider property " + key);
@@ -530,9 +720,10 @@ public abstract class Provider extends Properties {
      * @since 1.8
      */
     @Override
-    public synchronized Object computeIfAbsent(Object key, Function<? super Object, ? extends Object> mappingFunction) {
+    public synchronized Object computeIfAbsent(Object key, Function<? super Object,
+            ? extends Object> mappingFunction) {
         check("putProviderProperty." + name);
-        check("removeProviderProperty" + name);
+        check("removeProviderProperty." + name);
 
         if (debug != null) {
             debug.println("ComputeIfAbsent " + name + " provider property " +
@@ -559,9 +750,10 @@ public abstract class Provider extends Properties {
      * @since 1.8
      */
     @Override
-    public synchronized Object computeIfPresent(Object key, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction) {
+    public synchronized Object computeIfPresent(Object key, BiFunction<? super Object,
+            ? super Object, ? extends Object> remappingFunction) {
         check("putProviderProperty." + name);
-        check("removeProviderProperty" + name);
+        check("removeProviderProperty." + name);
 
         if (debug != null) {
             debug.println("ComputeIfPresent " + name + " provider property " +
@@ -591,9 +783,10 @@ public abstract class Provider extends Properties {
      * @since 1.8
      */
     @Override
-    public synchronized Object merge(Object key, Object value,  BiFunction<? super Object, ? super Object, ? extends Object>  remappingFunction) {
+    public synchronized Object merge(Object key, Object value,  BiFunction<? super Object,
+            ? super Object, ? extends Object>  remappingFunction) {
         check("putProviderProperty." + name);
-        check("removeProviderProperty" + name);
+        check("removeProviderProperty." + name);
 
         if (debug != null) {
             debug.println("Merge " + name + " provider property " + key);
@@ -662,14 +855,19 @@ public abstract class Provider extends Properties {
     // legacy properties changed since last call to any services method?
     private transient boolean legacyChanged;
     // serviceMap changed since last call to getServices()
-    private transient boolean servicesChanged;
+    private volatile transient boolean servicesChanged;
 
-    // Map<String,String>
+    // Map<String,String> used to keep track of legacy registration
     private transient Map<String,String> legacyStrings;
 
     // Map<ServiceKey,Service>
     // used for services added via putService(), initialized on demand
     private transient Map<ServiceKey,Service> serviceMap;
+
+    // For backward compatibility, the registration ordering of
+    // SecureRandom (RNG) algorithms needs to be preserved for
+    // "new SecureRandom()" calls when this provider is used
+    private transient Set<String> prngAlgos;
 
     // Map<ServiceKey,Service>
     // used for services added via legacy methods, init on demand
@@ -685,11 +883,21 @@ public abstract class Provider extends Properties {
     private void putId() {
         // note: name and info may be null
         super.put("Provider.id name", String.valueOf(name));
-        super.put("Provider.id version", String.valueOf(version));
+        super.put("Provider.id version", String.valueOf(versionStr));
         super.put("Provider.id info", String.valueOf(info));
         super.put("Provider.id className", this.getClass().getName());
     }
 
+   /**
+    * Reads the {@code ObjectInputStream} for the default serializable fields.
+    * If the serialized field {@code versionStr} is found in the STREAM FIELDS,
+    * its String value will be used to populate both the version string and
+    * version number. If {@code versionStr} is not found, but {@code version}
+    * is, then its double value will be used to populate both fields.
+    *
+    * @param in the {@code ObjectInputStream} to read
+    * @serial
+    */
     private void readObject(ObjectInputStream in)
                 throws IOException, ClassNotFoundException {
         Map<Object,Object> copy = new HashMap<>();
@@ -698,11 +906,20 @@ public abstract class Provider extends Properties {
         }
         defaults = null;
         in.defaultReadObject();
+        if (this.versionStr == null) {
+            // set versionStr based on version when not found in serialized bytes
+            this.versionStr = Double.toString(this.version);
+        } else {
+            // otherwise, set version based on versionStr
+            this.version = parseVersionStr(this.versionStr);
+        }
+        this.serviceMap = new ConcurrentHashMap<>();
         implClear();
         initialized = true;
         putAll(copy);
     }
 
+    // check whether to update 'legacyString' with the specified key
     private boolean checkLegacy(Object key) {
         String keyString = (String)key;
         if (keyString.startsWith("Provider.")) {
@@ -711,7 +928,7 @@ public abstract class Provider extends Properties {
 
         legacyChanged = true;
         if (legacyStrings == null) {
-            legacyStrings = new LinkedHashMap<String,String>();
+            legacyStrings = new LinkedHashMap<>();
         }
         return true;
     }
@@ -742,7 +959,7 @@ public abstract class Provider extends Properties {
             if (!checkLegacy(key)) {
                 return false;
             }
-            legacyStrings.remove((String)key, value);
+            legacyStrings.remove((String)key, (String)value);
         }
         return super.remove(key, value);
     }
@@ -769,57 +986,72 @@ public abstract class Provider extends Properties {
         return super.replace(key, value);
     }
 
-    private void implReplaceAll(BiFunction<? super Object, ? super Object, ? extends Object> function) {
+    @SuppressWarnings("unchecked") // Function must actually operate over strings
+    private void implReplaceAll(BiFunction<? super Object, ? super Object,
+            ? extends Object> function) {
         legacyChanged = true;
         if (legacyStrings == null) {
-            legacyStrings = new LinkedHashMap<String,String>();
+            legacyStrings = new LinkedHashMap<>();
         } else {
-            legacyStrings.replaceAll((BiFunction<? super String, ? super String, ? extends String>) function);
+            legacyStrings.replaceAll((BiFunction<? super String, ? super String,
+                    ? extends String>) function);
         }
         super.replaceAll(function);
     }
 
-
-    private Object implMerge(Object key, Object value, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction) {
+    @SuppressWarnings("unchecked") // Function must actually operate over strings
+    private Object implMerge(Object key, Object value,
+            BiFunction<? super Object, ? super Object, ? extends Object>
+            remappingFunction) {
         if ((key instanceof String) && (value instanceof String)) {
             if (!checkLegacy(key)) {
                 return null;
             }
             legacyStrings.merge((String)key, (String)value,
-                    (BiFunction<? super String, ? super String, ? extends String>) remappingFunction);
+                    (BiFunction<? super String, ? super String,
+                    ? extends String>) remappingFunction);
         }
         return super.merge(key, value, remappingFunction);
     }
 
-    private Object implCompute(Object key, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction) {
+    @SuppressWarnings("unchecked") // Function must actually operate over strings
+    private Object implCompute(Object key, BiFunction<? super Object,
+            ? super Object, ? extends Object> remappingFunction) {
         if (key instanceof String) {
             if (!checkLegacy(key)) {
                 return null;
             }
-            legacyStrings.computeIfAbsent((String) key,
-                    (Function<? super String, ? extends String>) remappingFunction);
+            legacyStrings.compute((String) key,
+                    (BiFunction<? super String,? super String,
+                    ? extends String>) remappingFunction);
         }
         return super.compute(key, remappingFunction);
     }
 
-    private Object implComputeIfAbsent(Object key, Function<? super Object, ? extends Object> mappingFunction) {
+    @SuppressWarnings("unchecked") // Function must actually operate over strings
+    private Object implComputeIfAbsent(Object key, Function<? super Object,
+            ? extends Object> mappingFunction) {
         if (key instanceof String) {
             if (!checkLegacy(key)) {
                 return null;
             }
             legacyStrings.computeIfAbsent((String) key,
-                    (Function<? super String, ? extends String>) mappingFunction);
+                    (Function<? super String, ? extends String>)
+                    mappingFunction);
         }
         return super.computeIfAbsent(key, mappingFunction);
     }
 
-    private Object implComputeIfPresent(Object key, BiFunction<? super Object, ? super Object, ? extends Object> remappingFunction) {
+    @SuppressWarnings("unchecked") // Function must actually operate over strings
+    private Object implComputeIfPresent(Object key, BiFunction<? super Object,
+            ? super Object, ? extends Object> remappingFunction) {
         if (key instanceof String) {
             if (!checkLegacy(key)) {
                 return null;
             }
             legacyStrings.computeIfPresent((String) key,
-                    (BiFunction<? super String, ? super String, ? extends String>) remappingFunction);
+                    (BiFunction<? super String, ? super String,
+                    ? extends String>) remappingFunction);
         }
         return super.computeIfPresent(key, remappingFunction);
     }
@@ -851,12 +1083,11 @@ public abstract class Provider extends Properties {
         if (legacyMap != null) {
             legacyMap.clear();
         }
-        if (serviceMap != null) {
-            serviceMap.clear();
-        }
+        serviceMap.clear();
         legacyChanged = false;
         servicesChanged = false;
         serviceSet = null;
+        prngAlgos = null;
         super.clear();
         putId();
     }
@@ -873,13 +1104,13 @@ public abstract class Provider extends Properties {
             this.algorithm = intern ? algorithm.intern() : algorithm;
         }
         public int hashCode() {
-            return type.hashCode() + algorithm.hashCode();
+            return Objects.hash(type, algorithm);
         }
         public boolean equals(Object obj) {
             if (this == obj) {
                 return true;
             }
-            if (obj instanceof ServiceKey == false) {
+            if (!(obj instanceof ServiceKey)) {
                 return false;
             }
             ServiceKey other = (ServiceKey)obj;
@@ -896,12 +1127,12 @@ public abstract class Provider extends Properties {
      * service objects.
      */
     private void ensureLegacyParsed() {
-        if ((legacyChanged == false) || (legacyStrings == null)) {
+        if (legacyChanged == false || (legacyStrings == null)) {
             return;
         }
         serviceSet = null;
         if (legacyMap == null) {
-            legacyMap = new LinkedHashMap<ServiceKey,Service>();
+            legacyMap = new ConcurrentHashMap<>();
         } else {
             legacyMap.clear();
         }
@@ -926,12 +1157,12 @@ public abstract class Provider extends Properties {
         }
     }
 
-    private String[] getTypeAndAlgorithm(String key) {
-        int i = key.indexOf(".");
+    private static String[] getTypeAndAlgorithm(String key) {
+        int i = key.indexOf('.');
         if (i < 1) {
             if (debug != null) {
-                debug.println("Ignoring invalid entry in provider "
-                        + name + ":" + key);
+                debug.println("Ignoring invalid entry in provider: "
+                        + key);
             }
             return null;
         }
@@ -940,9 +1171,9 @@ public abstract class Provider extends Properties {
         return new String[] {type, alg};
     }
 
-    private final static String ALIAS_PREFIX = "Alg.Alias.";
-    private final static String ALIAS_PREFIX_LOWER = "alg.alias.";
-    private final static int ALIAS_LENGTH = ALIAS_PREFIX.length();
+    private static final String ALIAS_PREFIX = "Alg.Alias.";
+    private static final String ALIAS_PREFIX_LOWER = "alg.alias.";
+    private static final int ALIAS_LENGTH = ALIAS_PREFIX.length();
 
     private void parseLegacyPut(String name, String value) {
         if (name.toLowerCase(ENGLISH).startsWith(ALIAS_PREFIX_LOWER)) {
@@ -957,7 +1188,10 @@ public abstract class Provider extends Properties {
             String type = getEngineName(typeAndAlg[0]);
             String aliasAlg = typeAndAlg[1].intern();
             ServiceKey key = new ServiceKey(type, stdAlg, true);
-            Service s = legacyMap.get(key);
+            Service s = serviceMap.get(key);
+            if (s == null) {
+                s = legacyMap.get(key);
+            }
             if (s == null) {
                 s = new Service(this);
                 s.type = type;
@@ -986,6 +1220,10 @@ public abstract class Provider extends Properties {
                     legacyMap.put(key, s);
                 }
                 s.className = className;
+
+                if (type.equals("SecureRandom")) {
+                    updateSecureRandomEntries(true, s.algorithm);
+                }
             } else { // attribute
                 // e.g. put("MessageDigest.SHA-1 ImplementedIn", "Software");
                 String attributeValue = value;
@@ -1031,22 +1269,28 @@ public abstract class Provider extends Properties {
      *
      * @since 1.5
      */
-    public synchronized Service getService(String type, String algorithm) {
+    public Service getService(String type, String algorithm) {
         checkInitialized();
-        // avoid allocating a new key object if possible
+
+        // avoid allocating a new ServiceKey object if possible
         ServiceKey key = previousKey;
         if (key.matches(type, algorithm) == false) {
             key = new ServiceKey(type, algorithm, false);
             previousKey = key;
         }
-        if (serviceMap != null) {
-            Service service = serviceMap.get(key);
-            if (service != null) {
-                return service;
+        if (!serviceMap.isEmpty()) {
+            Service s = serviceMap.get(key);
+            if (s != null) {
+                return s;
             }
         }
-        ensureLegacyParsed();
-        return (legacyMap != null) ? legacyMap.get(key) : null;
+        synchronized (this) {
+            ensureLegacyParsed();
+            if (legacyMap != null && !legacyMap.isEmpty()) {
+                return legacyMap.get(key);
+            }
+        }
+        return null;
     }
 
     // ServiceKey from previous getService() call
@@ -1075,10 +1319,10 @@ public abstract class Provider extends Properties {
         if (serviceSet == null) {
             ensureLegacyParsed();
             Set<Service> set = new LinkedHashSet<>();
-            if (serviceMap != null) {
+            if (!serviceMap.isEmpty()) {
                 set.addAll(serviceMap.values());
             }
-            if (legacyMap != null) {
+            if (legacyMap != null && !legacyMap.isEmpty()) {
                 set.addAll(legacyMap.values());
             }
             serviceSet = Collections.unmodifiableSet(set);
@@ -1093,8 +1337,8 @@ public abstract class Provider extends Properties {
      * it is replaced by the new service.
      * This method also places information about this service
      * in the provider's Hashtable values in the format described in the
-     * <a href="../../../technotes/guides/security/crypto/CryptoSpec.html">
-     * Java Cryptography Architecture API Specification &amp; Reference </a>.
+     * {@extLink security_guide_jca
+     * Java Cryptography Architecture (JCA) Reference Guide}.
      *
      * <p>Also, if there is a security manager, its
      * {@code checkSecurityAccess} method is called with the string
@@ -1116,7 +1360,7 @@ public abstract class Provider extends Properties {
      *
      * @since 1.5
      */
-    protected synchronized void putService(Service s) {
+    protected void putService(Service s) {
         check("putProviderProperty." + name);
         if (debug != null) {
             debug.println(name + ".putService(): " + s);
@@ -1128,20 +1372,58 @@ public abstract class Provider extends Properties {
             throw new IllegalArgumentException
                     ("service.getProvider() must match this Provider object");
         }
-        if (serviceMap == null) {
-            serviceMap = new LinkedHashMap<ServiceKey,Service>();
-        }
-        servicesChanged = true;
         String type = s.getType();
         String algorithm = s.getAlgorithm();
         ServiceKey key = new ServiceKey(type, algorithm, true);
-        // remove existing service
         implRemoveService(serviceMap.get(key));
         serviceMap.put(key, s);
         for (String alias : s.getAliases()) {
             serviceMap.put(new ServiceKey(type, alias, true), s);
         }
-        putPropertyStrings(s);
+        servicesChanged = true;
+        synchronized (this) {
+            putPropertyStrings(s);
+            if (type.equals("SecureRandom")) {
+                updateSecureRandomEntries(true, s.algorithm);
+            }
+        }
+    }
+
+    // keep tracks of the registered secure random algos and store them in order
+    private void updateSecureRandomEntries(boolean doAdd, String s) {
+        Objects.requireNonNull(s);
+        if (doAdd) {
+            if (prngAlgos == null) {
+                prngAlgos = new LinkedHashSet<String>();
+            }
+            prngAlgos.add(s);
+        } else {
+            prngAlgos.remove(s);
+        }
+
+        if (debug != null) {
+            debug.println((doAdd? "Add":"Remove") + " SecureRandom algo " + s);
+        }
+    }
+
+    // used by new SecureRandom() to find out the default SecureRandom
+    // service for this provider
+    synchronized Service getDefaultSecureRandomService() {
+        checkInitialized();
+
+        if (legacyChanged) {
+            prngAlgos = null;
+            ensureLegacyParsed();
+        }
+
+        if (prngAlgos != null && !prngAlgos.isEmpty()) {
+            // IMPORTANT: use the Service obj returned by getService(...) call
+            // as providers may override putService(...)/getService(...) and
+            // return their own Service objects
+            return getService("SecureRandom", prngAlgos.iterator().next());
+        }
+
+        return null;
     }
 
     /**
@@ -1208,7 +1490,7 @@ public abstract class Provider extends Properties {
      *
      * @since 1.5
      */
-    protected synchronized void removeService(Service s) {
+    protected void removeService(Service s) {
         check("removeProviderProperty." + name);
         if (debug != null) {
             debug.println(name + ".removeService(): " + s);
@@ -1220,7 +1502,7 @@ public abstract class Provider extends Properties {
     }
 
     private void implRemoveService(Service s) {
-        if ((s == null) || (serviceMap == null)) {
+        if ((s == null) || serviceMap.isEmpty()) {
             return;
         }
         String type = s.getType();
@@ -1235,7 +1517,12 @@ public abstract class Provider extends Properties {
         for (String alias : s.getAliases()) {
             serviceMap.remove(new ServiceKey(type, alias, false));
         }
-        removePropertyStrings(s);
+        synchronized (this) {
+            removePropertyStrings(s);
+            if (type.equals("SecureRandom")) {
+                updateSecureRandomEntries(false, s.algorithm);
+            }
+        }
     }
 
     // Wrapped String that behaves in a case insensitive way for equals/hashCode
@@ -1301,7 +1588,7 @@ public abstract class Provider extends Properties {
     }
 
     static {
-        knownEngines = new HashMap<String,EngineDescription>();
+        knownEngines = new HashMap<>();
         // JCA
         addEngine("AlgorithmParameterGenerator",        false, null);
         addEngine("AlgorithmParameters",                false, null);
@@ -1309,7 +1596,8 @@ public abstract class Provider extends Properties {
         addEngine("KeyPairGenerator",                   false, null);
         addEngine("KeyStore",                           false, null);
         addEngine("MessageDigest",                      false, null);
-        addEngine("SecureRandom",                       false, null);
+        addEngine("SecureRandom",                       false,
+                "java.security.SecureRandomParameters");
         addEngine("Signature",                          true,  null);
         addEngine("CertificateFactory",                 false, null);
         addEngine("CertPathBuilder",                    false, null);
@@ -1375,8 +1663,8 @@ public abstract class Provider extends Properties {
      * suitable services and instantiates them. The valid arguments to those
      * methods depend on the type of service. For the service types defined
      * within Java SE, see the
-     * <a href="../../../technotes/guides/security/crypto/CryptoSpec.html">
-     * Java Cryptography Architecture API Specification &amp; Reference </a>
+     * {@extLink security_guide_jca
+     * Java Cryptography Architecture (JCA) Reference Guide}
      * for the valid values.
      * Note that components outside of Java SE can define additional types of
      * services and their behavior.
@@ -1405,7 +1693,7 @@ public abstract class Provider extends Properties {
         private String[] supportedFormats;
 
         // names of the supported key (super) classes
-        private Class[] supportedClasses;
+        private Class<?>[] supportedClasses;
 
         // whether this service has been registered with the Provider
         private boolean registered;
@@ -1427,14 +1715,14 @@ public abstract class Provider extends Properties {
 
         private void addAlias(String alias) {
             if (aliases.isEmpty()) {
-                aliases = new ArrayList<String>(2);
+                aliases = new ArrayList<>(2);
             }
             aliases.add(alias);
         }
 
         void addAttribute(String type, String value) {
             if (attributes.isEmpty()) {
-                attributes = new HashMap<UString,String>(8);
+                attributes = new HashMap<>(8);
             }
             attributes.put(new UString(type), value);
         }
@@ -1467,12 +1755,12 @@ public abstract class Provider extends Properties {
             if (aliases == null) {
                 this.aliases = Collections.<String>emptyList();
             } else {
-                this.aliases = new ArrayList<String>(aliases);
+                this.aliases = new ArrayList<>(aliases);
             }
             if (attributes == null) {
                 this.attributes = Collections.<UString,String>emptyMap();
             } else {
-                this.attributes = new HashMap<UString,String>();
+                this.attributes = new HashMap<>();
                 for (Map.Entry<String,String> entry : attributes.entrySet()) {
                     this.attributes.put(new UString(entry.getKey()), entry.getValue());
                 }
@@ -1551,9 +1839,8 @@ public abstract class Provider extends Properties {
          * instantiation in a different way.
          * For details and the values of constructorParameter that are
          * valid for the various types of services see the
-         * <a href="../../../technotes/guides/security/crypto/CryptoSpec.html">
-         * Java Cryptography Architecture API Specification &amp;
-         * Reference</a>.
+         * {@extLink security_guide_jca
+         * Java Cryptography Architecture (JCA) Reference Guide}.
          *
          * @param constructorParameter the value to pass to the constructor,
          * or null if this type of service does not use a constructorParameter.
@@ -1575,39 +1862,36 @@ public abstract class Provider extends Properties {
                 }
                 registered = true;
             }
+            Class<?> ctrParamClz;
             try {
                 EngineDescription cap = knownEngines.get(type);
                 if (cap == null) {
                     // unknown engine type, use generic code
                     // this is the code path future for non-core
                     // optional packages
-                    return newInstanceGeneric(constructorParameter);
-                }
-                if (cap.constructorParameterClassName == null) {
-                    if (constructorParameter != null) {
-                        throw new InvalidParameterException
-                            ("constructorParameter not used with " + type
-                            + " engines");
-                    }
-                    Class<?> clazz = getImplClass();
-                    Class<?>[] empty = {};
-                    Constructor<?> con = clazz.getConstructor(empty);
-                    return con.newInstance();
+                    ctrParamClz = constructorParameter == null?
+                        null : constructorParameter.getClass();
                 } else {
-                    Class<?> paramClass = cap.getConstructorParameterClass();
+                    ctrParamClz = cap.constructorParameterClassName == null?
+                        null : Class.forName(cap.constructorParameterClassName);
                     if (constructorParameter != null) {
-                        Class<?> argClass = constructorParameter.getClass();
-                        if (paramClass.isAssignableFrom(argClass) == false) {
+                        if (ctrParamClz == null) {
                             throw new InvalidParameterException
-                            ("constructorParameter must be instanceof "
-                            + cap.constructorParameterClassName.replace('$', '.')
-                            + " for engine type " + type);
+                                ("constructorParameter not used with " + type
+                                + " engines");
+                        } else {
+                            Class<?> argClass = constructorParameter.getClass();
+                            if (ctrParamClz.isAssignableFrom(argClass) == false) {
+                                throw new InvalidParameterException
+                                    ("constructorParameter must be instanceof "
+                                    + cap.constructorParameterClassName.replace('$', '.')
+                                    + " for engine type " + type);
+                            }
                         }
                     }
-                    Class<?> clazz = getImplClass();
-                    Constructor<?> cons = clazz.getConstructor(paramClass);
-                    return cons.newInstance(constructorParameter);
                 }
+                // constructorParameter can be null if not provided
+                return newInstanceUtil(getImplClass(), ctrParamClz, constructorParameter);
             } catch (NoSuchAlgorithmException e) {
                 throw e;
             } catch (InvocationTargetException e) {
@@ -1640,7 +1924,7 @@ public abstract class Provider extends Properties {
                             ("class configured for " + type + " (provider: " +
                             provider.getName() + ") is not public.");
                     }
-                    classRef = new WeakReference<Class<?>>(clazz);
+                    classRef = new WeakReference<>(clazz);
                 }
                 return clazz;
             } catch (ClassNotFoundException e) {
@@ -1648,43 +1932,6 @@ public abstract class Provider extends Properties {
                     ("class configured for " + type + " (provider: " +
                     provider.getName() + ") cannot be found.", e);
             }
-        }
-
-        /**
-         * Generic code path for unknown engine types. Call the
-         * no-args constructor if constructorParameter is null, otherwise
-         * use the first matching constructor.
-         */
-        private Object newInstanceGeneric(Object constructorParameter)
-                throws Exception {
-            Class<?> clazz = getImplClass();
-            if (constructorParameter == null) {
-                // create instance with public no-arg constructor if it exists
-                try {
-                    Class<?>[] empty = {};
-                    Constructor<?> con = clazz.getConstructor(empty);
-                    return con.newInstance();
-                } catch (NoSuchMethodException e) {
-                    throw new NoSuchAlgorithmException("No public no-arg "
-                        + "constructor found in class " + className);
-                }
-            }
-            Class<?> argClass = constructorParameter.getClass();
-            Constructor[] cons = clazz.getConstructors();
-            // find first public constructor that can take the
-            // argument as parameter
-            for (Constructor<?> con : cons) {
-                Class<?>[] paramTypes = con.getParameterTypes();
-                if (paramTypes.length != 1) {
-                    continue;
-                }
-                if (paramTypes[0].isAssignableFrom(argClass) == false) {
-                    continue;
-                }
-                return con.newInstance(constructorParameter);
-            }
-            throw new NoSuchAlgorithmException("No public constructor matching "
-                + argClass.getName() + " found in class " + className);
         }
 
         /**
@@ -1700,14 +1947,13 @@ public abstract class Provider extends Properties {
          *
          * <p>For details and the values of parameter that are valid for the
          * various types of services see the top of this class and the
-         * <a href="../../../technotes/guides/security/crypto/CryptoSpec.html">
-         * Java Cryptography Architecture API Specification &amp;
-         * Reference</a>.
+         * {@extLink security_guide_jca
+         * Java Cryptography Architecture (JCA) Reference Guide}.
          * Security providers can override it to implement their own test.
          *
          * @param parameter the parameter to test
          *
-         * @return false if this this service cannot use the specified
+         * @return false if this service cannot use the specified
          * parameter; true if it can possibly use the parameter
          *
          * @throws InvalidParameterException if the value of parameter is
@@ -1746,7 +1992,7 @@ public abstract class Provider extends Properties {
         }
 
         /**
-         * Return whether this service has its Supported* properties for
+         * Return whether this service has its supported properties for
          * keys defined. Parses the attributes if not yet initialized.
          */
         private boolean hasKeyAttributes() {
@@ -1840,7 +2086,5 @@ public abstract class Provider extends Properties {
             return provider.getName() + ": " + type + "." + algorithm
                 + " -> " + className + aString + attrs + "\r\n";
         }
-
     }
-
 }

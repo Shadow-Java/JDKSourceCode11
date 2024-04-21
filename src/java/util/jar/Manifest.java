@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util.jar;
@@ -32,14 +32,15 @@ import java.io.OutputStream;
 import java.io.IOException;
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Iterator;
+
+import sun.nio.cs.UTF_8;
 
 /**
  * The Manifest class is used to maintain Manifest entry names and their
  * associated Attributes. There are main Manifest Attributes as well as
  * per-entry Attributes. For information on the Manifest format, please
  * see the
- * <a href="../../../../technotes/guides/jar/jar.html">
+ * <a href="{@docRoot}/../specs/jar/jar.html">
  * Manifest format specification</a>.
  *
  * @author  David Connelly
@@ -178,23 +179,22 @@ public class Manifest implements Cloneable {
      * @exception IOException if an I/O error has occurred
      * @see #getMainAttributes
      */
+    @SuppressWarnings("deprecation")
     public void write(OutputStream out) throws IOException {
         DataOutputStream dos = new DataOutputStream(out);
         // Write out the main attributes for the manifest
         attr.writeMain(dos);
-        // Now write out the pre-entry attributes
-        Iterator<Map.Entry<String, Attributes>> it = entries.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, Attributes> e = it.next();
+        // Now write out the per-entry attributes
+        for (Map.Entry<String, Attributes> e : entries.entrySet()) {
             StringBuffer buffer = new StringBuffer("Name: ");
             String value = e.getKey();
             if (value != null) {
-                byte[] vb = value.getBytes("UTF8");
+                byte[] vb = value.getBytes(UTF_8.INSTANCE);
                 value = new String(vb, 0, 0, vb.length);
             }
             buffer.append(value);
-            buffer.append("\r\n");
             make72Safe(buffer);
+            buffer.append("\r\n");
             dos.writeBytes(buffer.toString());
             e.getValue().write(dos);
         }
@@ -206,13 +206,11 @@ public class Manifest implements Cloneable {
      */
     static void make72Safe(StringBuffer line) {
         int length = line.length();
-        if (length > 72) {
-            int index = 70;
-            while (index < length - 2) {
-                line.insert(index, "\r\n ");
-                index += 72;
-                length += 3;
-            }
+        int index = 72;
+        while (index < length) {
+            line.insert(index, "\r\n ");
+            index += 74; // + line width + line break ("\r\n")
+            length += 3; // + line break ("\r\n") and space
         }
         return;
     }
@@ -243,7 +241,8 @@ public class Manifest implements Cloneable {
         byte[] lastline = null;
 
         while ((len = fis.readLine(lbuf)) != -1) {
-            if (lbuf[--len] != '\n') {
+            byte c = lbuf[--len];
+            if (c != '\n' && c != '\r') {
                 throw new IOException("manifest line too long");
             }
             if (len > 0 && lbuf[len-1] == '\r') {
@@ -275,7 +274,7 @@ public class Manifest implements Cloneable {
                     lastline = buf;
                     continue;
                 }
-                name = new String(buf, 0, buf.length, "UTF8");
+                name = new String(buf, 0, buf.length, UTF_8.INSTANCE);
                 lastline = null;
             }
             Attributes attr = getAttributes(name);
@@ -300,11 +299,7 @@ public class Manifest implements Cloneable {
         if (toLower(lbuf[0]) == 'n' && toLower(lbuf[1]) == 'a' &&
             toLower(lbuf[2]) == 'm' && toLower(lbuf[3]) == 'e' &&
             lbuf[4] == ':' && lbuf[5] == ' ') {
-            try {
-                return new String(lbuf, 6, len - 6, "UTF8");
-            }
-            catch (Exception e) {
-            }
+            return new String(lbuf, 6, len - 6, UTF_8.INSTANCE);
         }
         return null;
     }
@@ -419,13 +414,38 @@ public class Manifest implements Cloneable {
                 }
                 int tpos = pos;
                 int maxpos = tpos + n;
-                while (tpos < maxpos && tbuf[tpos++] != '\n') ;
+                byte c = 0;
+                // jar.spec.newline: CRLF | LF | CR (not followed by LF)
+                while (tpos < maxpos && (c = tbuf[tpos++]) != '\n' && c != '\r');
+                if (c == '\r' && tpos < maxpos && tbuf[tpos] == '\n') {
+                    tpos++;
+                }
                 n = tpos - pos;
                 System.arraycopy(tbuf, pos, b, off, n);
                 off += n;
                 total += n;
                 pos = tpos;
-                if (tbuf[tpos-1] == '\n') {
+                c = tbuf[tpos-1];
+                if (c == '\n') {
+                    break;
+                }
+                if (c == '\r') {
+                    if (count == pos) {
+                        // try to see if there is a trailing LF
+                        fill();
+                        if (pos < count && tbuf[pos] == '\n') {
+                            if (total < len) {
+                                b[off++] = '\n';
+                                total++;
+                            } else {
+                                // we should always have big enough lbuf but
+                                // just in case we don't, replace the last CR
+                                // with LF.
+                                b[off - 1] = '\n';
+                            }
+                            pos++;
+                        }
+                    }
                     break;
                 }
             }

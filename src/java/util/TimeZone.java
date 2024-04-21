@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2014, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
@@ -39,9 +39,9 @@
 package java.util;
 
 import java.io.Serializable;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.time.ZoneId;
+
+import jdk.internal.util.StaticProperty;
 import sun.security.action.GetPropertyAction;
 import sun.util.calendar.ZoneInfo;
 import sun.util.calendar.ZoneInfoFile;
@@ -73,7 +73,7 @@ import sun.util.locale.provider.TimeZoneNameUtility;
  * produce a TimeZone. The syntax of a custom time zone ID is:
  *
  * <blockquote><pre>
- * <a name="CustomID"><i>CustomID:</i></a>
+ * <a id="CustomID"><i>CustomID:</i></a>
  *         <code>GMT</code> <i>Sign</i> <i>Hours</i> <code>:</code> <i>Minutes</i>
  *         <code>GMT</code> <i>Sign</i> <i>Hours</i> <i>Minutes</i>
  *         <code>GMT</code> <i>Sign</i> <i>Hours</i>
@@ -101,7 +101,7 @@ import sun.util.locale.provider.TimeZoneNameUtility;
  * When creating a <code>TimeZone</code>, the specified custom time
  * zone ID is normalized in the following syntax:
  * <blockquote><pre>
- * <a name="NormalizedCustomID"><i>NormalizedCustomID:</i></a>
+ * <a id="NormalizedCustomID"><i>NormalizedCustomID:</i></a>
  *         <code>GMT</code> <i>Sign</i> <i>TwoDigitHours</i> <code>:</code> <i>Minutes</i>
  * <i>Sign:</i> one of
  *         <code>+ -</code>
@@ -128,9 +128,9 @@ import sun.util.locale.provider.TimeZoneNameUtility;
  * @see          GregorianCalendar
  * @see          SimpleTimeZone
  * @author       Mark Davis, David Goldsmith, Chen-Lieh Huang, Alan Liu
- * @since        JDK1.1
+ * @since        1.1
  */
-abstract public class TimeZone implements Serializable, Cloneable {
+public abstract class TimeZone implements Serializable, Cloneable {
     /**
      * Sole constructor.  (For invocation by subclass constructors, typically
      * implicit.)
@@ -253,7 +253,7 @@ abstract public class TimeZone implements Serializable, Cloneable {
      *
      * @param offsetMillis the given base time zone offset to GMT.
      */
-    abstract public void setRawOffset(int offsetMillis);
+    public abstract void setRawOffset(int offsetMillis);
 
     /**
      * Returns the amount of time in milliseconds to add to UTC to get
@@ -293,6 +293,7 @@ abstract public class TimeZone implements Serializable, Cloneable {
             throw new NullPointerException();
         }
         this.ID = ID;
+        this.zoneId = null;   // invalidate cache
     }
 
     /**
@@ -499,7 +500,7 @@ abstract public class TimeZone implements Serializable, Cloneable {
      * @return {@code true} if the given date is in Daylight Saving Time,
      *         {@code false}, otherwise.
      */
-    abstract public boolean inDaylightTime(Date date);
+    public abstract boolean inDaylightTime(Date date);
 
     /**
      * Gets the <code>TimeZone</code> for the given ID.
@@ -544,7 +545,23 @@ abstract public class TimeZone implements Serializable, Cloneable {
      * @since 1.8
      */
     public ZoneId toZoneId() {
+        ZoneId zId = zoneId;
+        if (zId == null) {
+            zoneId = zId = toZoneId0();
+        }
+        return zId;
+    }
+
+    private ZoneId toZoneId0() {
         String id = getID();
+        TimeZone defaultZone = defaultTimeZone;
+        // are we not defaultTimeZone but our id is equal to default's?
+        if (defaultZone != this &&
+            defaultZone != null && id.equals(defaultZone.getID())) {
+            // delegate to default TZ which is effectively immutable
+            return defaultZone.toZoneId();
+        }
+        // derive it ourselves
         if (ZoneInfoFile.useOldMapping() && id.length() == 3) {
             if ("EST".equals(id))
                 return ZoneId.of("America/New_York");
@@ -643,14 +660,13 @@ abstract public class TimeZone implements Serializable, Cloneable {
     private static synchronized TimeZone setDefaultZone() {
         TimeZone tz;
         // get the time zone ID from the system properties
-        String zoneID = AccessController.doPrivileged(
-                new GetPropertyAction("user.timezone"));
+        Properties props = GetPropertyAction.privilegedGetProperties();
+        String zoneID = props.getProperty("user.timezone");
 
         // if the time zone ID is not set (yet), perform the
         // platform to Java time zone ID mapping.
         if (zoneID == null || zoneID.isEmpty()) {
-            String javaHome = AccessController.doPrivileged(
-                    new GetPropertyAction("java.home"));
+            String javaHome = StaticProperty.javaHome();
             try {
                 zoneID = getSystemTimeZoneID(javaHome);
                 if (zoneID == null) {
@@ -678,13 +694,7 @@ abstract public class TimeZone implements Serializable, Cloneable {
         assert tz != null;
 
         final String id = zoneID;
-        AccessController.doPrivileged(new PrivilegedAction<Void>() {
-            @Override
-                public Void run() {
-                    System.setProperty("user.timezone", id);
-                    return null;
-                }
-            });
+        props.setProperty("user.timezone", id);
 
         defaultTimeZone = tz;
         return tz;
@@ -710,7 +720,12 @@ abstract public class TimeZone implements Serializable, Cloneable {
             sm.checkPermission(new PropertyPermission
                                ("user.timezone", "write"));
         }
-        defaultTimeZone = zone;
+        // by saving a defensive clone and returning a clone in getDefault() too,
+        // the defaultTimeZone instance is isolated from user code which makes it
+        // effectively immutable. This is important to avoid races when the
+        // following is evaluated in ZoneId.systemDefault():
+        // TimeZone.getDefault().toZoneId().
+        defaultTimeZone = (zone == null) ? null : (TimeZone) zone.clone();
     }
 
     /**
@@ -735,9 +750,7 @@ abstract public class TimeZone implements Serializable, Cloneable {
     public Object clone()
     {
         try {
-            TimeZone other = (TimeZone) super.clone();
-            other.ID = ID;
-            return other;
+            return super.clone();
         } catch (CloneNotSupportedException e) {
             throw new InternalError(e);
         }
@@ -759,13 +772,16 @@ abstract public class TimeZone implements Serializable, Cloneable {
      * @serial
      */
     private String           ID;
+
+    /**
+     * Cached {@link ZoneId} for this TimeZone
+     */
+    private transient ZoneId zoneId;
+
     private static volatile TimeZone defaultTimeZone;
 
     static final String         GMT_ID        = "GMT";
     private static final int    GMT_ID_LENGTH = 3;
-
-    // a static TimeZone we can reference if no AppContext is in place
-    private static volatile TimeZone mainAppContextDefault;
 
     /**
      * Parses a custom time zone identifier and returns a corresponding zone.

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -38,20 +38,20 @@ import java.util.Arrays;
  * Defined by <a href="http://www.ietf.org/rfc/rfc2373.txt">
  * <i>RFC&nbsp;2373: IP Version 6 Addressing Architecture</i></a>.
  *
- * <h3> <A NAME="format">Textual representation of IP addresses</a> </h3>
+ * <h3> <a id="format">Textual representation of IP addresses</a> </h3>
  *
  * Textual representation of IPv6 address used as input to methods
  * takes one of the following forms:
  *
  * <ol>
- *   <li><p> <A NAME="lform">The preferred form</a> is x:x:x:x:x:x:x:x,
+ *   <li><p> <a id="lform">The preferred form</a> is x:x:x:x:x:x:x:x,
  *   where the 'x's are
  *   the hexadecimal values of the eight 16-bit pieces of the
  *   address. This is the full form.  For example,
  *
- *   <blockquote><table cellpadding=0 cellspacing=0 summary="layout">
- *   <tr><td>{@code 1080:0:0:0:8:800:200C:417A}<td></tr>
- *   </table></blockquote>
+ *   <blockquote><ul style="list-style-type:none">
+ *   <li>{@code 1080:0:0:0:8:800:200C:417A}</li>
+ *   </ul></blockquote>
  *
  *   <p> Note that it is not necessary to write the leading zeros in
  *   an individual field. However, there must be at least one numeral
@@ -66,9 +66,9 @@ import java.util.Arrays;
  *   The "::" can also be used to compress the leading and/or trailing
  *   zeros in an address. For example,
  *
- *   <blockquote><table cellpadding=0 cellspacing=0 summary="layout">
- *   <tr><td>{@code 1080::8:800:200C:417A}<td></tr>
- *   </table></blockquote>
+ *   <blockquote><ul style="list-style-type:none">
+ *   <li>{@code 1080::8:800:200C:417A}</li>
+ *   </ul></blockquote>
  *
  *   <li><p> An alternative form that is sometimes more convenient
  *   when dealing with a mixed environment of IPv4 and IPv6 nodes is
@@ -77,35 +77,35 @@ import java.util.Arrays;
  *   are the decimal values of the four low-order 8-bit pieces of the
  *   standard IPv4 representation address, for example,
  *
- *   <blockquote><table cellpadding=0 cellspacing=0 summary="layout">
- *   <tr><td>{@code ::FFFF:129.144.52.38}<td></tr>
- *   <tr><td>{@code ::129.144.52.38}<td></tr>
- *   </table></blockquote>
+ *   <blockquote><ul style="list-style-type:none">
+ *   <li>{@code ::FFFF:129.144.52.38}</li>
+ *   <li>{@code ::129.144.52.38}</li>
+ *   </ul></blockquote>
  *
  *   <p> where "::FFFF:d.d.d.d" and "::d.d.d.d" are, respectively, the
  *   general forms of an IPv4-mapped IPv6 address and an
  *   IPv4-compatible IPv6 address. Note that the IPv4 portion must be
  *   in the "d.d.d.d" form. The following forms are invalid:
  *
- *   <blockquote><table cellpadding=0 cellspacing=0 summary="layout">
- *   <tr><td>{@code ::FFFF:d.d.d}<td></tr>
- *   <tr><td>{@code ::FFFF:d.d}<td></tr>
- *   <tr><td>{@code ::d.d.d}<td></tr>
- *   <tr><td>{@code ::d.d}<td></tr>
- *   </table></blockquote>
+ *   <blockquote><ul style="list-style-type:none">
+ *   <li>{@code ::FFFF:d.d.d}</li>
+ *   <li>{@code ::FFFF:d.d}</li>
+ *   <li>{@code ::d.d.d}</li>
+ *   <li>{@code ::d.d}</li>
+ *   </ul></blockquote>
  *
  *   <p> The following form:
  *
- *   <blockquote><table cellpadding=0 cellspacing=0 summary="layout">
- *   <tr><td>{@code ::FFFF:d}<td></tr>
- *   </table></blockquote>
+ *   <blockquote><ul style="list-style-type:none">
+ *   <li>{@code ::FFFF:d}</li>
+ *   </ul></blockquote>
  *
  *   <p> is valid, however it is an unconventional representation of
  *   the IPv4-compatible IPv6 address,
  *
- *   <blockquote><table cellpadding=0 cellspacing=0 summary="layout">
- *   <tr><td>{@code ::255.255.0.d}<td></tr>
- *   </table></blockquote>
+ *   <blockquote><ul style="list-style-type:none">
+ *   <li>{@code ::255.255.0.d}</li>
+ *   </ul></blockquote>
  *
  *   <p> while "::d" corresponds to the general IPv6 address
  *   "0:0:0:0:0:0:0:d".</li>
@@ -119,9 +119,10 @@ import java.util.Arrays;
  * <h4> Special IPv6 address </h4>
  *
  * <blockquote>
- * <table cellspacing=2 summary="Description of IPv4-mapped address">
- * <tr><th valign=top><i>IPv4-mapped address</i></th>
- *         <td>Of the form::ffff:w.x.y.z, this IPv6 address is used to
+ * <table class="borderless">
+ * <caption style="display:none">Description of IPv4-mapped address</caption>
+ * <tr><th style="vertical-align:top; padding-right:2px"><i>IPv4-mapped address</i></th>
+ *         <td>Of the form ::ffff:w.x.y.z, this IPv6 address is used to
  *         represent an IPv4 address. It allows the native program to
  *         use the same address data structure and also the same
  *         socket when communicating with both IPv4 and IPv6 nodes.
@@ -134,7 +135,7 @@ import java.util.Arrays;
  *         address.</td></tr>
  * </table></blockquote>
  *
- * <h4><A NAME="scoped">Textual representation of IPv6 scoped addresses</a></h4>
+ * <h4><a id="scoped">Textual representation of IPv6 scoped addresses</a></h4>
  *
  * <p> The textual representation of IPv6 addresses as described above can be
  * extended to specify IPv6 scoped addresses. This extension to the basic
@@ -173,7 +174,7 @@ import java.util.Arrays;
 
 public final
 class Inet6Address extends InetAddress {
-    final static int INADDRSZ = 16;
+    static final int INADDRSZ = 16;
 
     /*
      * cached scope_id - for link-local address use only.
@@ -432,7 +433,7 @@ class Inet6Address extends InetAddress {
                                             NetworkInterface nif)
         throws UnknownHostException
     {
-        if (host != null && host.length() > 0 && host.charAt(0) == '[') {
+        if (host != null && !host.isEmpty() && host.charAt(0) == '[') {
             if (host.charAt(host.length()-1) == ']') {
                 host = host.substring(1, host.length() -1);
             }
@@ -465,7 +466,7 @@ class Inet6Address extends InetAddress {
                                             int scope_id)
         throws UnknownHostException
     {
-        if (host != null && host.length() > 0 && host.charAt(0) == '[') {
+        if (host != null && !host.isEmpty() && host.charAt(0) == '[') {
             if (host.charAt(host.length()-1) == ']') {
                 host = host.substring(1, host.length() -1);
             }
@@ -575,19 +576,10 @@ class Inet6Address extends InetAddress {
          new ObjectStreamField("ifname", String.class)
     };
 
-    private static final long FIELDS_OFFSET;
-    private static final sun.misc.Unsafe UNSAFE;
-
-    static {
-        try {
-            sun.misc.Unsafe unsafe = sun.misc.Unsafe.getUnsafe();
-            FIELDS_OFFSET = unsafe.objectFieldOffset(
-                    Inet6Address.class.getDeclaredField("holder6"));
-            UNSAFE = unsafe;
-        } catch (ReflectiveOperationException e) {
-            throw new Error(e);
-        }
-    }
+    private static final jdk.internal.misc.Unsafe UNSAFE
+            = jdk.internal.misc.Unsafe.getUnsafe();
+    private static final long FIELDS_OFFSET = UNSAFE.objectFieldOffset(
+                Inet6Address.class, "holder6");
 
     /**
      * restore the state of this object from stream
@@ -603,13 +595,13 @@ class Inet6Address extends InetAddress {
         }
 
         ObjectInputStream.GetField gf = s.readFields();
-        byte[] ipaddress = (byte[])gf.get("ipaddress", null);
-        int scope_id = (int)gf.get("scope_id", -1);
-        boolean scope_id_set = (boolean)gf.get("scope_id_set", false);
-        boolean scope_ifname_set = (boolean)gf.get("scope_ifname_set", false);
+        byte[] ipaddress = (byte[])gf.get("ipaddress", new byte[0]);
+        int scope_id = gf.get("scope_id", -1);
+        boolean scope_id_set = gf.get("scope_id_set", false);
+        boolean scope_ifname_set = gf.get("scope_ifname_set", false);
         String ifname = (String)gf.get("ifname", null);
 
-        if (ifname != null && !"".equals (ifname)) {
+        if (ifname != null && !ifname.isEmpty()) {
             try {
                 scope_ifname = NetworkInterface.getByName(ifname);
                 if (scope_ifname == null) {
@@ -682,8 +674,6 @@ class Inet6Address extends InetAddress {
      *
      * @return a {@code boolean} indicating if the InetAddress is an IP
      *         multicast address
-     *
-     * @since JDK1.1
      */
     @Override
     public boolean isMulticastAddress() {
@@ -691,12 +681,10 @@ class Inet6Address extends InetAddress {
     }
 
     /**
-     * Utility routine to check if the InetAddress in a wildcard address.
+     * Utility routine to check if the InetAddress is a wildcard address.
      *
      * @return a {@code boolean} indicating if the Inetaddress is
      *         a wildcard address.
-     *
-     * @since 1.4
      */
     @Override
     public boolean isAnyLocalAddress() {
@@ -708,8 +696,6 @@ class Inet6Address extends InetAddress {
      *
      * @return a {@code boolean} indicating if the InetAddress is a loopback
      *         address; or false otherwise.
-     *
-     * @since 1.4
      */
     @Override
     public boolean isLoopbackAddress() {
@@ -721,8 +707,6 @@ class Inet6Address extends InetAddress {
      *
      * @return a {@code boolean} indicating if the InetAddress is a link local
      *         address; or false if address is not a link local unicast address.
-     *
-     * @since 1.4
      */
     @Override
     public boolean isLinkLocalAddress() {
@@ -740,8 +724,6 @@ class Inet6Address extends InetAddress {
      *
      * @return a {@code boolean} indicating if the InetAddress is a site local
      *         address; or false if address is not a site local unicast address.
-     *
-     * @since 1.4
      */
     @Override
     public boolean isSiteLocalAddress() {
@@ -760,8 +742,6 @@ class Inet6Address extends InetAddress {
      * @return a {@code boolean} indicating if the address has is a multicast
      *         address of global scope, false if it is not of global scope or
      *         it is not a multicast address
-     *
-     * @since 1.4
      */
     @Override
     public boolean isMCGlobal() {
@@ -774,8 +754,6 @@ class Inet6Address extends InetAddress {
      * @return a {@code boolean} indicating if the address has is a multicast
      *         address of node-local scope, false if it is not of node-local
      *         scope or it is not a multicast address
-     *
-     * @since 1.4
      */
     @Override
     public boolean isMCNodeLocal() {
@@ -788,8 +766,6 @@ class Inet6Address extends InetAddress {
      * @return a {@code boolean} indicating if the address has is a multicast
      *         address of link-local scope, false if it is not of link-local
      *         scope or it is not a multicast address
-     *
-     * @since 1.4
      */
     @Override
     public boolean isMCLinkLocal() {
@@ -802,8 +778,6 @@ class Inet6Address extends InetAddress {
      * @return a {@code boolean} indicating if the address has is a multicast
      *         address of site-local scope, false if it is not  of site-local
      *         scope or it is not a multicast address
-     *
-     * @since 1.4
      */
     @Override
     public boolean isMCSiteLocal() {
@@ -816,8 +790,6 @@ class Inet6Address extends InetAddress {
      * @return a {@code boolean} indicating if the address has is a multicast
      *         address of organization-local scope, false if it is not of
      *         organization-local scope or it is not a multicast address
-     *
-     * @since 1.4
      */
     @Override
     public boolean isMCOrgLocal() {
@@ -914,23 +886,21 @@ class Inet6Address extends InetAddress {
      *
      * @return a {@code boolean} indicating if the InetAddress is an IPv4
      *         compatible IPv6 address; or false if address is IPv4 address.
-     *
-     * @since 1.4
      */
     public boolean isIPv4CompatibleAddress() {
         return holder6.isIPv4CompatibleAddress();
     }
 
     // Utilities
-    private final static int INT16SZ = 2;
 
-    /*
+    private static final int INT16SZ = 2;
+
+    /**
      * Convert IPv6 binary address into presentation (printable) format.
      *
      * @param src a byte array representing the IPv6 numeric address
      * @return a String representing an IPv6 address in
      *         textual representation format
-     * @since 1.4
      */
     static String numericToTextFormat(byte[] src) {
         StringBuilder sb = new StringBuilder(39);

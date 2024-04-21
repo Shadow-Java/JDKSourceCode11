@@ -1,26 +1,26 @@
 /*
  * Copyright (c) 2005, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.net;
@@ -81,7 +81,7 @@ import sun.util.logging.PlatformLogger;
  *   <li>
  *     Currently, only CookieStore.add(URI, HttpCookie) and CookieStore.get(URI)
  *     are used by CookieManager. Others are for completeness and might be needed
- *     by a more sophisticated CookieStore implementation, e.g. a NetscapeCookieSotre.
+ *     by a more sophisticated CookieStore implementation, e.g. a NetscapeCookieStore.
  *   </li>
  * </ul>
  * </blockquote>
@@ -201,14 +201,12 @@ public class CookieManager extends CookieHandler
             throw new IllegalArgumentException("Argument is null");
         }
 
-        Map<String, List<String>> cookieMap =
-                        new java.util.HashMap<String, List<String>>();
         // if there's no default CookieStore, no way for us to get any cookie
         if (cookieJar == null)
-            return Collections.unmodifiableMap(cookieMap);
+            return Map.of();
 
         boolean secureLink = "https".equalsIgnoreCase(uri.getScheme());
-        List<HttpCookie> cookies = new java.util.ArrayList<HttpCookie>();
+        List<HttpCookie> cookies = new java.util.ArrayList<>();
         String path = uri.getPath();
         if (path == null || path.isEmpty()) {
             path = "/";
@@ -245,8 +243,7 @@ public class CookieManager extends CookieHandler
         // apply sort rule (RFC 2965 sec. 3.3.4)
         List<String> cookieHeader = sortByPath(cookies);
 
-        cookieMap.put("Cookie", cookieHeader);
-        return Collections.unmodifiableMap(cookieMap);
+        return Map.of("Cookie", cookieHeader);
     }
 
     public void
@@ -294,7 +291,7 @@ public class CookieManager extends CookieHandler
                             // the path is the directory of the page/doc
                             String path = uri.getPath();
                             if (!path.endsWith("/")) {
-                                int i = path.lastIndexOf("/");
+                                int i = path.lastIndexOf('/');
                                 if (i > 0) {
                                     path = path.substring(0, i + 1);
                                 } else {
@@ -363,19 +360,19 @@ public class CookieManager extends CookieHandler
     }
 
 
-    static private boolean isInPortList(String lst, int port) {
-        int i = lst.indexOf(",");
+    private static boolean isInPortList(String lst, int port) {
+        int i = lst.indexOf(',');
         int val = -1;
         while (i > 0) {
             try {
-                val = Integer.parseInt(lst.substring(0, i));
+                val = Integer.parseInt(lst, 0, i, 10);
                 if (val == port) {
                     return true;
                 }
             } catch (NumberFormatException numberFormatException) {
             }
             lst = lst.substring(i+1);
-            i = lst.indexOf(",");
+            i = lst.indexOf(',');
         }
         if (!lst.isEmpty()) {
             try {
@@ -411,7 +408,7 @@ public class CookieManager extends CookieHandler
     private List<String> sortByPath(List<HttpCookie> cookies) {
         Collections.sort(cookies, new CookiePathComparator());
 
-        List<String> cookieHeader = new java.util.ArrayList<String>();
+        List<String> cookieHeader = new java.util.ArrayList<>();
         for (HttpCookie cookie : cookies) {
             // Netscape cookie spec and RFC 2965 have different format of Cookie
             // header; RFC 2965 requires a leading $Version="1" string while Netscape

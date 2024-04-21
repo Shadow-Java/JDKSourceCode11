@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2007, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /**
@@ -33,7 +33,7 @@
  * package is used by service provider implementors wishing to extend the
  * platform default provider, or to construct other provider implementations. </p>
  *
- * <h3><a name="links">Symbolic Links</a></h3>
+ * <h2><a id="links">Symbolic Links</a></h2>
  * <p> Many operating systems and file systems support for <em>symbolic links</em>.
  * A symbolic link is a special file that serves as a reference to another file.
  * For the most part, symbolic links are transparent to applications and
@@ -45,7 +45,7 @@
  * that are semantically close but support for these other types of links is
  * not included in this package. </p>
  *
- * <h3><a name="interop">Interoperability</a></h3>
+ * <h2><a id="interop">Interoperability</a></h2>
  * <p> The {@link java.io.File} class defines the {@link java.io.File#toPath
  * toPath} method to construct a {@link java.nio.file.Path} by converting
  * the abstract path represented by the {@code java.io.File} object. The resulting
@@ -54,7 +54,7 @@
  * on the <a href="Path.html#interop">interoperability</a> between {@code Path}
  * and {@code java.io.File} objects. </p>
  *
- * <h3>Visibility</h3>
+ * <h2>Visibility</h2>
  * <p> The view of the files and file system provided by classes in this package are
  * guaranteed to be consistent with other views provided by other instances in the
  * same Java virtual machine.  The view may or may not, however, be consistent with
@@ -65,7 +65,7 @@
  * or on some other machine.  The exact nature of any such inconsistencies are
  * system-dependent and are therefore unspecified. </p>
  *
- * <h3><a name="integrity">Synchronized I/O File Integrity</a></h3>
+ * <h2><a id="integrity">Synchronized I/O File Integrity</a></h2>
  * <p> The {@link java.nio.file.StandardOpenOption#SYNC SYNC} and {@link
  * java.nio.file.StandardOpenOption#DSYNC DSYNC} options are used when opening a file
  * to require that updates to the file are written synchronously to the underlying
@@ -82,12 +82,12 @@
  * java.nio.file.spi.FileSystemProvider provider} implementations is provider
  * specific. </p>
  *
- * <h3>General Exceptions</h3>
+ * <h2>General Exceptions</h2>
  * <p> Unless otherwise noted, passing a {@code null} argument to a constructor
  * or method of any class or interface in this package will cause a {@link
  * java.lang.NullPointerException NullPointerException} to be thrown. Additionally,
- * invoking a method with a collection containing a {@code null} element will
- * cause a {@code NullPointerException}, unless otherwise specified. </p>
+ * invoking a method with an array or collection containing a {@code null} element
+ * will cause a {@code NullPointerException}, unless otherwise specified. </p>
  *
  * <p> Unless otherwise noted, methods that attempt to access the file system
  * will throw {@link java.nio.file.ClosedFileSystemException} when invoked on
@@ -103,7 +103,7 @@
  * provider} with a parameter that is an object created by another provider,
  * will throw {@link java.nio.file.ProviderMismatchException}. </p>
  *
- * <h3>Optional Specific Exceptions</h3>
+ * <h2>Optional Specific Exceptions</h2>
  * Most of the methods defined by classes in this package that access the
  * file system specify that {@link java.io.IOException} be thrown when an I/O
  * error occurs. In some cases, these methods define specific I/O exceptions

@@ -1,34 +1,35 @@
 /*
  * Copyright (c) 2010, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang;
 
-import java.lang.ClassValue.ClassValueMap;
 import java.util.WeakHashMap;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import jdk.internal.misc.Unsafe;
 
 import static java.lang.ClassValue.ClassValueMap.probeHomeLocation;
 import static java.lang.ClassValue.ClassValueMap.probeBackupLocations;
@@ -163,7 +164,7 @@ public abstract class ClassValue<T> {
      * observe the time-dependent states as it computes {@code V1}, etc.
      * This does not remove the threat of a stale value, since there is a window of time
      * between the return of {@code computeValue} in {@code T} and the installation
-     * of the the new value.  No user synchronization is possible during this time.
+     * of the new value.  No user synchronization is possible during this time.
      *
      * @param type the type whose class value must be removed
      * @throws NullPointerException if the argument is null
@@ -286,7 +287,7 @@ public abstract class ClassValue<T> {
      * will receive the notification without delay.
      * <p>
      * If version were not volatile, one thread T1 could persistently hold onto
-     * a stale value this.value == V1, while while another thread T2 advances
+     * a stale value this.value == V1, while another thread T2 advances
      * (under a lock) to this.value == V2.  This will typically be harmless,
      * but if T1 and T2 interact causally via some other channel, such that
      * T1's further actions are constrained (in the JMM) to happen after
@@ -370,15 +371,25 @@ public abstract class ClassValue<T> {
     }
 
     private static final Object CRITICAL_SECTION = new Object();
+    private static final Unsafe UNSAFE = Unsafe.getUnsafe();
     private static ClassValueMap initializeMap(Class<?> type) {
         ClassValueMap map;
         synchronized (CRITICAL_SECTION) {  // private object to avoid deadlocks
             // happens about once per type
-            if ((map = type.classValueMap) == null)
-                type.classValueMap = map = new ClassValueMap(type);
+            if ((map = type.classValueMap) == null) {
+                map = new ClassValueMap();
+                // Place a Store fence after construction and before publishing to emulate
+                // ClassValueMap containing final fields. This ensures it can be
+                // published safely in the non-volatile field Class.classValueMap,
+                // since stores to the fields of ClassValueMap will not be reordered
+                // to occur after the store to the field type.classValueMap
+                UNSAFE.storeFence();
+
+                type.classValueMap = map;
+            }
         }
-            return map;
-        }
+        return map;
+    }
 
     static <T> Entry<T> makeEntry(Version<T> explicitVersion, T value) {
         // Note that explicitVersion might be different from this.version.
@@ -398,12 +409,11 @@ public abstract class ClassValue<T> {
 
     // The following class could also be top level and non-public:
 
-    /** A backing map for all ClassValues, relative a single given type.
+    /** A backing map for all ClassValues.
      *  Gives a fully serialized "true state" for each pair (ClassValue cv, Class type).
      *  Also manages an unserialized fast-path cache.
      */
     static class ClassValueMap extends WeakHashMap<ClassValue.Identity, Entry<?>> {
-        private final Class<?> type;
         private Entry<?>[] cacheArray;
         private int cacheLoad, cacheLoadLimit;
 
@@ -413,11 +423,10 @@ public abstract class ClassValue<T> {
          */
         private static final int INITIAL_ENTRIES = 32;
 
-        /** Build a backing map for ClassValues, relative the given type.
+        /** Build a backing map for ClassValues.
          *  Also, create an empty cache array and install it on the class.
          */
-        ClassValueMap(Class<?> type) {
-            this.type = type;
+        ClassValueMap() {
             sizeCache(INITIAL_ENTRIES);
         }
 

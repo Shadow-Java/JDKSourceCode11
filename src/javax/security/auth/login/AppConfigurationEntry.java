@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1998, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1998, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package javax.security.auth.login;
@@ -39,6 +39,7 @@ import java.util.Collections;
  * options.  Please refer to the {@code Configuration} class for
  * more information on the different control flags and their semantics.
  *
+ * @since 1.4
  * @see javax.security.auth.login.Configuration
  */
 public class AppConfigurationEntry {
@@ -57,10 +58,10 @@ public class AppConfigurationEntry {
      *
      * @param loginModuleName String representing the class name of the
      *                  {@code LoginModule} configured for the
-     *                  specified application. <p>
+     *                  specified application.
      *
      * @param controlFlag either REQUIRED, REQUISITE, SUFFICIENT,
-     *                  or OPTIONAL. <p>
+     *                  or OPTIONAL.
      *
      * @param options the options configured for this {@code LoginModule}.
      *
@@ -74,7 +75,7 @@ public class AppConfigurationEntry {
                                 LoginModuleControlFlag controlFlag,
                                 Map<String,?> options)
     {
-        if (loginModuleName == null || loginModuleName.length() == 0 ||
+        if (loginModuleName == null || loginModuleName.isEmpty() ||
             (controlFlag != LoginModuleControlFlag.REQUIRED &&
                 controlFlag != LoginModuleControlFlag.REQUISITE &&
                 controlFlag != LoginModuleControlFlag.SUFFICIENT &&

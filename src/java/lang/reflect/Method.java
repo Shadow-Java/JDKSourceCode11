@@ -1,33 +1,38 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.reflect;
 
-import sun.reflect.CallerSensitive;
-import sun.reflect.MethodAccessor;
-import sun.reflect.Reflection;
+import jdk.internal.HotSpotIntrinsicCandidate;
+import jdk.internal.misc.SharedSecrets;
+import jdk.internal.reflect.CallerSensitive;
+import jdk.internal.reflect.MethodAccessor;
+import jdk.internal.reflect.Reflection;
+import jdk.internal.vm.annotation.ForceInline;
+import sun.reflect.annotation.ExceptionProxy;
+import sun.reflect.annotation.TypeNotPresentExceptionProxy;
 import sun.reflect.generics.repository.MethodRepository;
 import sun.reflect.generics.factory.CoreReflectionFactory;
 import sun.reflect.generics.factory.GenericsFactory;
@@ -37,6 +42,7 @@ import sun.reflect.annotation.AnnotationParser;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.AnnotationFormatError;
 import java.nio.ByteBuffer;
+import java.util.StringJoiner;
 
 /**
  * A {@code Method} provides information about, and access to, a single method
@@ -57,6 +63,7 @@ import java.nio.ByteBuffer;
  *
  * @author Kenneth Russell
  * @author Nakul Saraiya
+ * @since 1.1
  */
 public final class Method extends Executable {
     private Class<?>            clazz;
@@ -160,10 +167,39 @@ public final class Method extends Executable {
     }
 
     /**
-     * Used by Excecutable for annotation sharing.
+     * Make a copy of a leaf method.
+     */
+    Method leafCopy() {
+        if (this.root == null)
+            throw new IllegalArgumentException("Can only leafCopy a non-root Method");
+
+        Method res = new Method(clazz, name, parameterTypes, returnType,
+                exceptionTypes, modifiers, slot, signature,
+                annotations, parameterAnnotations, annotationDefault);
+        res.root = root;
+        res.methodAccessor = methodAccessor;
+        return res;
+    }
+
+    /**
+     * @throws InaccessibleObjectException {@inheritDoc}
+     * @throws SecurityException {@inheritDoc}
      */
     @Override
-    Executable getRoot() {
+    @CallerSensitive
+    public void setAccessible(boolean flag) {
+        AccessibleObject.checkPermission();
+        if (flag) checkCanSetAccessible(Reflection.getCallerClass());
+        setAccessible0(flag);
+    }
+
+    @Override
+    void checkCanSetAccessible(Class<?> caller) {
+        checkCanSetAccessible(caller, clazz);
+    }
+
+    @Override
+    Method getRoot() {
         return root;
     }
 
@@ -178,7 +214,8 @@ public final class Method extends Executable {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the {@code Class} object representing the class or interface
+     * that declares the method represented by this object.
      */
     @Override
     public Class<?> getDeclaringClass() {
@@ -254,6 +291,16 @@ public final class Method extends Executable {
       if (getGenericSignature() != null) {
         return getGenericInfo().getReturnType();
       } else { return getReturnType();}
+    }
+
+    @Override
+    Class<?>[] getSharedParameterTypes() {
+        return parameterTypes;
+    }
+
+    @Override
+    Class<?>[] getSharedExceptionTypes() {
+        return exceptionTypes;
     }
 
     /**
@@ -339,7 +386,7 @@ public final class Method extends Executable {
      * the method name, followed by a parenthesized, comma-separated
      * list of the method's formal parameter types. If the method
      * throws checked exceptions, the parameter list is followed by a
-     * space, followed by the word throws followed by a
+     * space, followed by the word "{@code throws}" followed by a
      * comma-separated list of the thrown exception types.
      * For example:
      * <pre>
@@ -356,6 +403,8 @@ public final class Method extends Executable {
      * @return a string describing this {@code Method}
      *
      * @jls 8.4.3 Method Modifiers
+     * @jls 9.4   Method Declarations
+     * @jls 9.6.1 Annotation Type Elements
      */
     public String toString() {
         return sharedToString(Modifier.methodModifiers(),
@@ -371,6 +420,21 @@ public final class Method extends Executable {
         sb.append(getName());
     }
 
+    @Override
+    String toShortString() {
+        StringBuilder sb = new StringBuilder("method ");
+        sb.append(getDeclaringClass().getTypeName()).append('.');
+        sb.append(getName());
+        sb.append('(');
+        StringJoiner sj = new StringJoiner(",");
+        for (Class<?> parameterType : getParameterTypes()) {
+            sj.add(parameterType.getTypeName());
+        }
+        sb.append(sj);
+        sb.append(')');
+        return sb.toString();
+    }
+
     /**
      * Returns a string describing this {@code Method}, including
      * type parameters.  The string is formatted as the method access
@@ -384,8 +448,8 @@ public final class Method extends Executable {
      *
      * If this method was declared to take a variable number of
      * arguments, instead of denoting the last parameter as
-     * "<tt><i>Type</i>[]</tt>", it is denoted as
-     * "<tt><i>Type</i>...</tt>".
+     * "<code><i>Type</i>[]</code>", it is denoted as
+     * "<code><i>Type</i>...</code>".
      *
      * A space is used to separate access modifiers from one another
      * and from the type parameters or return type.  If there are no
@@ -393,8 +457,8 @@ public final class Method extends Executable {
      * parameter list is present, a space separates the list from the
      * class name.  If the method is declared to throw exceptions, the
      * parameter list is followed by a space, followed by the word
-     * throws followed by a comma-separated list of the generic thrown
-     * exception types.
+     * "{@code throws}" followed by a comma-separated list of the generic
+     * thrown exception types.
      *
      * <p>The access modifiers are placed in canonical order as
      * specified by "The Java Language Specification".  This is
@@ -409,6 +473,8 @@ public final class Method extends Executable {
      * @since 1.5
      *
      * @jls 8.4.3 Method Modifiers
+     * @jls 9.4   Method Declarations
+     * @jls 9.6.1 Annotation Type Elements
      */
     @Override
     public String toGenericString() {
@@ -439,8 +505,8 @@ public final class Method extends Executable {
      *
      * <p>If the underlying method is an instance method, it is invoked
      * using dynamic method lookup as documented in The Java Language
-     * Specification, Second Edition, section 15.12.4.4; in particular,
-     * overriding based on the runtime type of the target object will occur.
+     * Specification, section 15.12.4.4; in particular,
+     * overriding based on the runtime type of the target object may occur.
      *
      * <p>If the underlying method is static, the class that declared
      * the method is initialized if it has not already been initialized.
@@ -481,15 +547,17 @@ public final class Method extends Executable {
      * provoked by this method fails.
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
+    @HotSpotIntrinsicCandidate
     public Object invoke(Object obj, Object... args)
         throws IllegalAccessException, IllegalArgumentException,
            InvocationTargetException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, clazz,
+                        Modifier.isStatic(modifiers) ? null : obj.getClass(),
+                        modifiers);
         }
         MethodAccessor ma = methodAccessor;             // read volatile
         if (ma == null) {
@@ -605,11 +673,16 @@ public final class Method extends Executable {
             getReturnType());
         Object result = AnnotationParser.parseMemberValue(
             memberType, ByteBuffer.wrap(annotationDefault),
-            sun.misc.SharedSecrets.getJavaLangAccess().
+            SharedSecrets.getJavaLangAccess().
                 getConstantPool(getDeclaringClass()),
             getDeclaringClass());
-        if (result instanceof sun.reflect.annotation.ExceptionProxy)
+        if (result instanceof ExceptionProxy) {
+            if (result instanceof TypeNotPresentExceptionProxy) {
+                TypeNotPresentExceptionProxy proxy = (TypeNotPresentExceptionProxy)result;
+                throw new TypeNotPresentException(proxy.typeName(), proxy.getCause());
+            }
             throw new AnnotationFormatError("Invalid default: " + this);
+        }
         return result;
     }
 
@@ -649,7 +722,7 @@ public final class Method extends Executable {
     }
 
     @Override
-    void handleParameterNumberMismatch(int resultLength, int numParameters) {
+    boolean handleParameterNumberMismatch(int resultLength, int numParameters) {
         throw new AnnotationFormatError("Parameter annotations don't match number of parameters");
     }
 }

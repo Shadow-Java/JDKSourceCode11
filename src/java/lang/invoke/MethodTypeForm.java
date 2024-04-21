@@ -1,33 +1,36 @@
 /*
- * Copyright (c) 2008, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2008, 2018, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.invoke;
 
+import jdk.internal.vm.annotation.Stable;
 import sun.invoke.util.Wrapper;
+
 import java.lang.ref.SoftReference;
-import static java.lang.invoke.MethodHandleStatics.*;
+
+import static java.lang.invoke.MethodHandleStatics.newIllegalArgumentException;
 
 /**
  * Shared information for a group of method types, which differ
@@ -80,7 +83,10 @@ final class MethodTypeForm {
             LF_MH_LINKER               = 15,  // linkToCallSite_MH
             LF_GWC                     = 16,  // guardWithCatch (catchException)
             LF_GWT                     = 17,  // guardWithTest
-            LF_LIMIT                   = 18;
+            LF_TF                      = 18,  // tryFinally
+            LF_LOOP                    = 19,  // loop
+            LF_INVSPECIAL_IFC          = 20,  // DMH invokeSpecial of (private) interface method
+            LF_LIMIT                   = 21;
 
     /** Return the type corresponding uniquely (1-1) to this MT-form.
      *  It might have any primitive returns or arguments, but will have no references except Object.
@@ -111,7 +117,7 @@ final class MethodTypeForm {
         return (entry != null) ? entry.get() : null;
     }
 
-    synchronized public MethodHandle setCachedMethodHandle(int which, MethodHandle mh) {
+    public synchronized MethodHandle setCachedMethodHandle(int which, MethodHandle mh) {
         // Simulate a CAS, to avoid racy duplication of results.
         SoftReference<MethodHandle> entry = methodHandles[which];
         if (entry != null) {
@@ -130,7 +136,7 @@ final class MethodTypeForm {
         return (entry != null) ? entry.get() : null;
     }
 
-    synchronized public LambdaForm setCachedLambdaForm(int which, LambdaForm form) {
+    public synchronized LambdaForm setCachedLambdaForm(int which, LambdaForm form) {
         // Simulate a CAS, to avoid racy duplication of results.
         SoftReference<LambdaForm> entry = lambdaForms[which];
         if (entry != null) {

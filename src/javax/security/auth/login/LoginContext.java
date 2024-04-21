@@ -1,42 +1,42 @@
 /*
- * Copyright (c) 1998, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1998, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package javax.security.auth.login;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.lang.reflect.InvocationTargetException;
-import java.util.LinkedList;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Map;
 import java.util.HashMap;
 import java.text.MessageFormat;
 import javax.security.auth.Subject;
 import javax.security.auth.AuthPermission;
 import javax.security.auth.callback.*;
-import java.security.AccessController;
+import javax.security.auth.spi.LoginModule;
 import java.security.AccessControlContext;
+import java.util.ServiceLoader;
+
 import sun.security.util.PendingException;
 import sun.security.util.ResourcesMgr;
 
@@ -108,7 +108,6 @@ import sun.security.util.ResourcesMgr;
  *
  * <li> If the constructor does <b>not</b> have a Subject
  * input parameter, the LoginContext instantiates a new Subject.
- * <p>
  * </ul>
  *
  * <li> {@code Configuration}
@@ -150,7 +149,6 @@ import sun.security.util.ResourcesMgr;
  * This means the caller context (stored when the LoginContext was created)
  * must have sufficient permissions to perform any security-sensitive tasks
  * that the modules may perform.
- * <p>
  * </ul>
  *
  * <li> {@code CallbackHandler}
@@ -184,6 +182,7 @@ import sun.security.util.ResourcesMgr;
  * </ul>
  * </ol>
  *
+ * @since 1.4
  * @see java.security.Security
  * @see javax.security.auth.AuthPermission
  * @see javax.security.auth.Subject
@@ -194,7 +193,6 @@ import sun.security.util.ResourcesMgr;
  */
 public class LoginContext {
 
-    private static final String INIT_METHOD             = "initialize";
     private static final String LOGIN_METHOD            = "login";
     private static final String COMMIT_METHOD           = "commit";
     private static final String ABORT_METHOD            = "abort";
@@ -212,7 +210,6 @@ public class LoginContext {
     private AccessControlContext creatorAcc = null;  // customized config only
     private ModuleInfo[] moduleStack;
     private ClassLoader contextClassLoader = null;
-    private static final Class<?>[] PARAMS = { };
 
     // state saved in the event a user-specified asynchronous exception
     // was specified and thrown
@@ -303,12 +300,14 @@ public class LoginContext {
                 public CallbackHandler run() throws Exception {
                     String defaultHandler = java.security.Security.getProperty
                         (DEFAULT_HANDLER);
-                    if (defaultHandler == null || defaultHandler.length() == 0)
+                    if (defaultHandler == null || defaultHandler.isEmpty())
                         return null;
                     Class<? extends CallbackHandler> c = Class.forName(
                             defaultHandler, true,
                             finalLoader).asSubclass(CallbackHandler.class);
-                    return c.newInstance();
+                    @SuppressWarnings("deprecation")
+                    CallbackHandler result = c.newInstance();
+                    return result;
                 }
             });
         } catch (java.security.PrivilegedActionException pae) {
@@ -332,15 +331,15 @@ public class LoginContext {
      * @exception LoginException if the caller-specified {@code name}
      *          does not appear in the {@code Configuration}
      *          and there is no {@code Configuration} entry
-     *          for "<i>other</i>", or if the
-     *          <i>auth.login.defaultCallbackHandler</i>
+     *          for "{@code other}", or if the
+     *          {@code auth.login.defaultCallbackHandler}
      *          security property was set, but the implementation
      *          class could not be loaded.
-     *          <p>
+     *
      * @exception SecurityException if a SecurityManager is set and
      *          the caller does not have
      *          AuthPermission("createLoginContext.<i>name</i>"),
-     *          or if a configuration entry for <i>name</i> does not exist and
+     *          or if a configuration entry for {@code name} does not exist and
      *          the caller does not additionally have
      *          AuthPermission("createLoginContext.other")
      */
@@ -353,10 +352,8 @@ public class LoginContext {
      * Instantiate a new {@code LoginContext} object with a name
      * and a {@code Subject} object.
      *
-     * <p>
-     *
      * @param name the name used as the index into the
-     *          {@code Configuration}. <p>
+     *          {@code Configuration}.
      *
      * @param subject the {@code Subject} to authenticate.
      *
@@ -368,7 +365,7 @@ public class LoginContext {
      *          <i>auth.login.defaultCallbackHandler</i>
      *          security property was set, but the implementation
      *          class could not be loaded.
-     *          <p>
+     *
      * @exception SecurityException if a SecurityManager is set and
      *          the caller does not have
      *          AuthPermission("createLoginContext.<i>name</i>"),
@@ -391,10 +388,8 @@ public class LoginContext {
      * Instantiate a new {@code LoginContext} object with a name
      * and a {@code CallbackHandler} object.
      *
-     * <p>
-     *
      * @param name the name used as the index into the
-     *          {@code Configuration}. <p>
+     *          {@code Configuration}.
      *
      * @param callbackHandler the {@code CallbackHandler} object used by
      *          LoginModules to communicate with the user.
@@ -402,9 +397,9 @@ public class LoginContext {
      * @exception LoginException if the caller-specified {@code name}
      *          does not appear in the {@code Configuration}
      *          and there is no {@code Configuration} entry
-     *          for "<i>other</i>", or if the caller-specified
+     *          for "{@code other}", or if the caller-specified
      *          {@code callbackHandler} is {@code null}.
-     *          <p>
+     *
      * @exception SecurityException if a SecurityManager is set and
      *          the caller does not have
      *          AuthPermission("createLoginContext.<i>name</i>"),
@@ -428,12 +423,10 @@ public class LoginContext {
      * a {@code Subject} to be authenticated, and a
      * {@code CallbackHandler} object.
      *
-     * <p>
-     *
      * @param name the name used as the index into the
-     *          {@code Configuration}. <p>
+     *          {@code Configuration}.
      *
-     * @param subject the {@code Subject} to authenticate. <p>
+     * @param subject the {@code Subject} to authenticate.
      *
      * @param callbackHandler the {@code CallbackHandler} object used by
      *          LoginModules to communicate with the user.
@@ -445,7 +438,7 @@ public class LoginContext {
      *          {@code subject} is {@code null},
      *          or if the caller-specified
      *          {@code callbackHandler} is {@code null}.
-     *          <p>
+     *
      * @exception SecurityException if a SecurityManager is set and
      *          the caller does not have
      *          AuthPermission("createLoginContext.<i>name</i>"),
@@ -467,20 +460,16 @@ public class LoginContext {
     /**
      * Instantiate a new {@code LoginContext} object with a name,
      * a {@code Subject} to be authenticated,
-     * a {@code CallbackHandler} object, and a login
-     * {@code Configuration}.
-     *
-     * <p>
+     * a {@code CallbackHandler} object, and a login {@code Configuration}.
      *
      * @param name the name used as the index into the caller-specified
-     *          {@code Configuration}. <p>
+     *          {@code Configuration}.
      *
      * @param subject the {@code Subject} to authenticate,
-     *          or {@code null}. <p>
+     *          or {@code null}.
      *
      * @param callbackHandler the {@code CallbackHandler} object used by
      *          LoginModules to communicate with the user, or {@code null}.
-     *          <p>
      *
      * @param config the {@code Configuration} that lists the
      *          login modules to be called to perform the authentication,
@@ -490,7 +479,7 @@ public class LoginContext {
      *          does not appear in the {@code Configuration}
      *          and there is no {@code Configuration} entry
      *          for "<i>other</i>".
-     *          <p>
+     *
      * @exception SecurityException if a SecurityManager is set,
      *          <i>config</i> is {@code null},
      *          and either the caller does not have
@@ -570,8 +559,6 @@ public class LoginContext {
      * {@code abort} phase.  This guarantees that proper cleanup
      * and state restoration can take place.
      *
-     * <p>
-     *
      * @exception LoginException if the authentication fails.
      */
     public void login() throws LoginException {
@@ -614,8 +601,6 @@ public class LoginContext {
      * ignored for this method.  This guarantees that proper cleanup
      * and state restoration can take place.
      *
-     * <p>
-     *
      * @exception LoginException if the logout fails.
      */
     public void logout() throws LoginException {
@@ -630,8 +615,6 @@ public class LoginContext {
 
     /**
      * Return the authenticated Subject.
-     *
-     * <p>
      *
      * @return the authenticated Subject.  If the caller specified a
      *          Subject to this LoginContext's constructor,
@@ -696,63 +679,64 @@ public class LoginContext {
         for (int i = moduleIndex; i < moduleStack.length; i++, moduleIndex++) {
             try {
 
-                int mIndex = 0;
-                Method[] methods = null;
+                if (moduleStack[i].module == null) {
 
-                if (moduleStack[i].module != null) {
-                    methods = moduleStack[i].module.getClass().getMethods();
-                } else {
-
-                    // instantiate the LoginModule
+                    // locate and instantiate the LoginModule
                     //
-                    // Allow any object to be a LoginModule as long as it
-                    // conforms to the interface.
-                    Class<?> c = Class.forName(
-                                moduleStack[i].entry.getLoginModuleName(),
-                                true,
-                                contextClassLoader);
-
-                    Constructor<?> constructor = c.getConstructor(PARAMS);
-                    Object[] args = { };
-                    moduleStack[i].module = constructor.newInstance(args);
-
-                    // call the LoginModule's initialize method
-                    methods = moduleStack[i].module.getClass().getMethods();
-                    for (mIndex = 0; mIndex < methods.length; mIndex++) {
-                        if (methods[mIndex].getName().equals(INIT_METHOD)) {
+                    String name = moduleStack[i].entry.getLoginModuleName();
+                    ServiceLoader<LoginModule> sc = AccessController.doPrivileged(
+                            (PrivilegedAction<ServiceLoader<LoginModule>>)
+                                    () -> ServiceLoader.load(
+                                        LoginModule.class, contextClassLoader));
+                    for (LoginModule m: sc) {
+                        if (m.getClass().getName().equals(name)) {
+                            moduleStack[i].module = m;
+                            if (debug != null) {
+                                debug.println(name + " loaded as a service");
+                            }
                             break;
                         }
                     }
 
-                    Object[] initArgs = {subject,
-                                        callbackHandler,
-                                        state,
-                                        moduleStack[i].entry.getOptions() };
+                    if (moduleStack[i].module == null) {
+                        try {
+                            @SuppressWarnings("deprecation")
+                            Object tmp = Class.forName(name, false, contextClassLoader).newInstance();
+                            moduleStack[i].module = (LoginModule) tmp;
+                            if (debug != null) {
+                                debug.println(name + " loaded via reflection");
+                            }
+                        } catch (ClassNotFoundException e) {
+                            throw new LoginException("No LoginModule found for "
+                                    + name);
+                        }
+                    }
+
                     // invoke the LoginModule initialize method
-                    //
-                    // Throws ArrayIndexOutOfBoundsException if no such
-                    // method defined.  May improve to use LoginException in
-                    // the future.
-                    methods[mIndex].invoke(moduleStack[i].module, initArgs);
+                    moduleStack[i].module.initialize(subject,
+                            callbackHandler,
+                            state,
+                            moduleStack[i].entry.getOptions());
                 }
 
                 // find the requested method in the LoginModule
-                for (mIndex = 0; mIndex < methods.length; mIndex++) {
-                    if (methods[mIndex].getName().equals(methodName)) {
+                boolean status;
+                switch (methodName) {
+                    case LOGIN_METHOD:
+                        status = moduleStack[i].module.login();
                         break;
-                    }
+                    case COMMIT_METHOD:
+                        status = moduleStack[i].module.commit();
+                        break;
+                    case LOGOUT_METHOD:
+                        status = moduleStack[i].module.logout();
+                        break;
+                    case ABORT_METHOD:
+                        status = moduleStack[i].module.abort();
+                        break;
+                    default:
+                        throw new AssertionError("Unknown method " + methodName);
                 }
-
-                // set up the arguments to be passed to the LoginModule method
-                Object[] args = { };
-
-                // invoke the LoginModule method
-                //
-                // Throws ArrayIndexOutOfBoundsException if no such
-                // method defined.  May improve to use LoginException in
-                // the future.
-                boolean status = ((Boolean)methods[mIndex].invoke
-                                (moduleStack[i].module, args)).booleanValue();
 
                 if (status == true) {
 
@@ -778,31 +762,12 @@ public class LoginContext {
                     if (debug != null)
                         debug.println(methodName + " ignored");
                 }
-
-            } catch (NoSuchMethodException nsme) {
-                MessageFormat form = new MessageFormat(ResourcesMgr.getString
-                        ("unable.to.instantiate.LoginModule.module.because.it.does.not.provide.a.no.argument.constructor"));
-                Object[] source = {moduleStack[i].entry.getLoginModuleName()};
-                throwException(null, new LoginException(form.format(source)));
-            } catch (InstantiationException ie) {
-                throwException(null, new LoginException(ResourcesMgr.getString
-                        ("unable.to.instantiate.LoginModule.") +
-                        ie.getMessage()));
-            } catch (ClassNotFoundException cnfe) {
-                throwException(null, new LoginException(ResourcesMgr.getString
-                        ("unable.to.find.LoginModule.class.") +
-                        cnfe.getMessage()));
-            } catch (IllegalAccessException iae) {
-                throwException(null, new LoginException(ResourcesMgr.getString
-                        ("unable.to.access.LoginModule.") +
-                        iae.getMessage()));
-            } catch (InvocationTargetException ite) {
+            } catch (Exception ite) {
 
                 // failure cases
-
                 LoginException le;
 
-                if (ite.getCause() instanceof PendingException &&
+                if (ite instanceof PendingException &&
                     methodName.equals(LOGIN_METHOD)) {
 
                     // XXX
@@ -826,13 +791,13 @@ public class LoginContext {
                     // the only time that is not true is in this case -
                     // do not call throwException here.
 
-                    throw (PendingException)ite.getCause();
+                    throw (PendingException)ite;
 
-                } else if (ite.getCause() instanceof LoginException) {
+                } else if (ite instanceof LoginException) {
 
-                    le = (LoginException)ite.getCause();
+                    le = (LoginException)ite;
 
-                } else if (ite.getCause() instanceof SecurityException) {
+                } else if (ite instanceof SecurityException) {
 
                     // do not want privacy leak
                     // (e.g., sensitive file path in exception msg)
@@ -844,14 +809,14 @@ public class LoginContext {
                             ("original security exception with detail msg " +
                             "replaced by new exception with empty detail msg");
                         debug.println("original security exception: " +
-                                ite.getCause().toString());
+                                ite.toString());
                     }
                 } else {
 
                     // capture an unexpected LoginModule exception
                     java.io.StringWriter sw = new java.io.StringWriter();
-                    ite.getCause().printStackTrace
-                                                (new java.io.PrintWriter(sw));
+                    ite.printStackTrace
+                            (new java.io.PrintWriter(sw));
                     sw.flush();
                     le = new LoginException(sw.toString());
                 }
@@ -956,9 +921,9 @@ public class LoginContext {
      */
     private static class ModuleInfo {
         AppConfigurationEntry entry;
-        Object module;
+        LoginModule module;
 
-        ModuleInfo(AppConfigurationEntry newEntry, Object newModule) {
+        ModuleInfo(AppConfigurationEntry newEntry, LoginModule newModule) {
             this.entry = newEntry;
             this.module = newModule;
         }

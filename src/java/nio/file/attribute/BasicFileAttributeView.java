@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.file.attribute;
@@ -41,47 +41,52 @@ import java.io.IOException;
  * <p> Where dynamic access to file attributes is required, the attributes
  * supported by this attribute view have the following names and types:
  * <blockquote>
- *  <table border="1" cellpadding="8" summary="Supported attributes">
+ *  <table class="striped">
+ *  <caption style="display:none">Supported attributes</caption>
+ *  <thead>
  *   <tr>
- *     <th> Name </th>
- *     <th> Type </th>
+ *     <th scope="col"> Name </th>
+ *     <th scope="col"> Type </th>
  *   </tr>
+ *  </thead>
+ *  <tbody>
  *  <tr>
- *     <td> "lastModifiedTime" </td>
+ *     <th scope="row"> "lastModifiedTime" </th>
  *     <td> {@link FileTime} </td>
  *   </tr>
  *   <tr>
- *     <td> "lastAccessTime" </td>
+ *     <th scope="row"> "lastAccessTime" </th>
  *     <td> {@link FileTime} </td>
  *   </tr>
  *   <tr>
- *     <td> "creationTime" </td>
+ *     <th scope="row"> "creationTime" </th>
  *     <td> {@link FileTime} </td>
  *   </tr>
  *   <tr>
- *     <td> "size" </td>
+ *     <th scope="row"> "size" </th>
  *     <td> {@link Long} </td>
  *   </tr>
  *   <tr>
- *     <td> "isRegularFile" </td>
+ *     <th scope="row"> "isRegularFile" </th>
  *     <td> {@link Boolean} </td>
  *   </tr>
  *   <tr>
- *     <td> "isDirectory" </td>
+ *     <th scope="row"> "isDirectory" </th>
  *     <td> {@link Boolean} </td>
  *   </tr>
  *   <tr>
- *     <td> "isSymbolicLink" </td>
+ *     <th scope="row"> "isSymbolicLink" </th>
  *     <td> {@link Boolean} </td>
  *   </tr>
  *   <tr>
- *     <td> "isOther" </td>
+ *     <th scope="row"> "isOther" </th>
  *     <td> {@link Boolean} </td>
  *   </tr>
  *   <tr>
- *     <td> "fileKey" </td>
+ *     <th scope="row"> "fileKey" </th>
  *     <td> {@link Object} </td>
  *   </tr>
+ * </tbody>
  * </table>
  * </blockquote>
  *

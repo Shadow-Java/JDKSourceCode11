@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -34,7 +34,13 @@
  */
 
 package java.util.concurrent;
-import java.util.*;
+
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Provides default implementations of {@link ExecutorService}
@@ -51,7 +57,7 @@ import java.util.*;
  * <p><b>Extension example</b>. Here is a sketch of a class
  * that customizes {@link ThreadPoolExecutor} to use
  * a {@code CustomTask} class instead of the default {@code FutureTask}:
- *  <pre> {@code
+ * <pre> {@code
  * public class CustomThreadPoolExecutor extends ThreadPoolExecutor {
  *
  *   static class CustomTask<V> implements RunnableFuture<V> {...}
@@ -146,7 +152,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
         int ntasks = tasks.size();
         if (ntasks == 0)
             throw new IllegalArgumentException();
-        ArrayList<Future<T>> futures = new ArrayList<Future<T>>(ntasks);
+        ArrayList<Future<T>> futures = new ArrayList<>(ntasks);
         ExecutorCompletionService<T> ecs =
             new ExecutorCompletionService<T>(this);
 
@@ -179,7 +185,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
                     else if (active == 0)
                         break;
                     else if (timed) {
-                        f = ecs.poll(nanos, TimeUnit.NANOSECONDS);
+                        f = ecs.poll(nanos, NANOSECONDS);
                         if (f == null)
                             throw new TimeoutException();
                         nanos = deadline - System.nanoTime();
@@ -204,8 +210,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
             throw ee;
 
         } finally {
-            for (int i = 0, size = futures.size(); i < size; i++)
-                futures.get(i).cancel(true);
+            cancelAll(futures);
         }
     }
 
@@ -229,8 +234,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
         throws InterruptedException {
         if (tasks == null)
             throw new NullPointerException();
-        ArrayList<Future<T>> futures = new ArrayList<Future<T>>(tasks.size());
-        boolean done = false;
+        ArrayList<Future<T>> futures = new ArrayList<>(tasks.size());
         try {
             for (Callable<T> t : tasks) {
                 RunnableFuture<T> f = newTaskFor(t);
@@ -240,19 +244,14 @@ public abstract class AbstractExecutorService implements ExecutorService {
             for (int i = 0, size = futures.size(); i < size; i++) {
                 Future<T> f = futures.get(i);
                 if (!f.isDone()) {
-                    try {
-                        f.get();
-                    } catch (CancellationException ignore) {
-                    } catch (ExecutionException ignore) {
-                    }
+                    try { f.get(); }
+                    catch (CancellationException | ExecutionException ignore) {}
                 }
             }
-            done = true;
             return futures;
-        } finally {
-            if (!done)
-                for (int i = 0, size = futures.size(); i < size; i++)
-                    futures.get(i).cancel(true);
+        } catch (Throwable t) {
+            cancelAll(futures);
+            throw t;
         }
     }
 
@@ -261,47 +260,51 @@ public abstract class AbstractExecutorService implements ExecutorService {
         throws InterruptedException {
         if (tasks == null)
             throw new NullPointerException();
-        long nanos = unit.toNanos(timeout);
-        ArrayList<Future<T>> futures = new ArrayList<Future<T>>(tasks.size());
-        boolean done = false;
-        try {
+        final long nanos = unit.toNanos(timeout);
+        final long deadline = System.nanoTime() + nanos;
+        ArrayList<Future<T>> futures = new ArrayList<>(tasks.size());
+        int j = 0;
+        timedOut: try {
             for (Callable<T> t : tasks)
                 futures.add(newTaskFor(t));
 
-            final long deadline = System.nanoTime() + nanos;
             final int size = futures.size();
 
             // Interleave time checks and calls to execute in case
             // executor doesn't have any/much parallelism.
             for (int i = 0; i < size; i++) {
+                if (((i == 0) ? nanos : deadline - System.nanoTime()) <= 0L)
+                    break timedOut;
                 execute((Runnable)futures.get(i));
-                nanos = deadline - System.nanoTime();
-                if (nanos <= 0L)
-                    return futures;
             }
 
-            for (int i = 0; i < size; i++) {
-                Future<T> f = futures.get(i);
+            for (; j < size; j++) {
+                Future<T> f = futures.get(j);
                 if (!f.isDone()) {
-                    if (nanos <= 0L)
-                        return futures;
-                    try {
-                        f.get(nanos, TimeUnit.NANOSECONDS);
-                    } catch (CancellationException ignore) {
-                    } catch (ExecutionException ignore) {
-                    } catch (TimeoutException toe) {
-                        return futures;
+                    try { f.get(deadline - System.nanoTime(), NANOSECONDS); }
+                    catch (CancellationException | ExecutionException ignore) {}
+                    catch (TimeoutException timedOut) {
+                        break timedOut;
                     }
-                    nanos = deadline - System.nanoTime();
                 }
             }
-            done = true;
             return futures;
-        } finally {
-            if (!done)
-                for (int i = 0, size = futures.size(); i < size; i++)
-                    futures.get(i).cancel(true);
+        } catch (Throwable t) {
+            cancelAll(futures);
+            throw t;
         }
+        // Timed out before all the tasks could be completed; cancel remaining
+        cancelAll(futures, j);
+        return futures;
     }
 
+    private static <T> void cancelAll(ArrayList<Future<T>> futures) {
+        cancelAll(futures, 0);
+    }
+
+    /** Cancels all futures with index at least j. */
+    private static <T> void cancelAll(ArrayList<Future<T>> futures, int j) {
+        for (int size = futures.size(); j < size; j++)
+            futures.get(j).cancel(true);
+    }
 }

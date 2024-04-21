@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2003, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -42,7 +42,7 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * Note that a serialized Key may contain sensitive information
  * which should not be exposed in untrusted environments.  See the
- * <a href="../../../platform/serialization/spec/security.html">
+ * <a href="{@docRoot}/../specs/serialization/security.html">
  * Security Appendix</a>
  * of the Serialization Specification for more information.
  *
@@ -112,8 +112,6 @@ public class KeyRep implements Serializable {
     /**
      * Construct the alternate Key class.
      *
-     * <p>
-     *
      * @param type either one of Type.SECRET, Type.PUBLIC, or Type.PRIVATE
      * @param algorithm the algorithm returned from
      *          {@code Key.getAlgorithm()}
@@ -156,8 +154,6 @@ public class KeyRep implements Serializable {
      * the key algorithm, constructs a PKCS8EncodedKeySpec with the
      * encoded key bytes, and generates a private key from the spec
      * </ul>
-     *
-     * <p>
      *
      * @return the resolved Key object
      *

@@ -1,34 +1,35 @@
 /*
  * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.invoke;
 
 import jdk.internal.org.objectweb.asm.*;
 import sun.invoke.util.BytecodeDescriptor;
-import sun.misc.Unsafe;
+import jdk.internal.misc.Unsafe;
 import sun.security.action.GetPropertyAction;
+import sun.security.action.GetBooleanAction;
 
 import java.io.FilePermission;
 import java.io.Serializable;
@@ -66,15 +67,15 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
     private static final String NAME_METHOD_WRITE_REPLACE = "writeReplace";
     private static final String NAME_METHOD_READ_OBJECT = "readObject";
     private static final String NAME_METHOD_WRITE_OBJECT = "writeObject";
+
+    private static final String DESCR_CLASS = "Ljava/lang/Class;";
+    private static final String DESCR_STRING = "Ljava/lang/String;";
+    private static final String DESCR_OBJECT = "Ljava/lang/Object;";
     private static final String DESCR_CTOR_SERIALIZED_LAMBDA
-            = MethodType.methodType(void.class,
-                                    Class.class,
-                                    String.class, String.class, String.class,
-                                    int.class, String.class, String.class, String.class,
-                                    String.class,
-                                    Object[].class).toMethodDescriptorString();
-    private static final String DESCR_CTOR_NOT_SERIALIZABLE_EXCEPTION
-            = MethodType.methodType(void.class, String.class).toMethodDescriptorString();
+            = "(" + DESCR_CLASS + DESCR_STRING + DESCR_STRING + DESCR_STRING + "I"
+            + DESCR_STRING + DESCR_STRING + DESCR_STRING + DESCR_STRING + "[" + DESCR_OBJECT + ")V";
+
+    private static final String DESCR_CTOR_NOT_SERIALIZABLE_EXCEPTION = "(Ljava/lang/String;)V";
     private static final String[] SER_HOSTILE_EXCEPTIONS = new String[] {NAME_NOT_SERIALIZABLE_EXCEPTION};
 
 
@@ -86,19 +87,22 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
     // For dumping generated classes to disk, for debugging purposes
     private static final ProxyClassesDumper dumper;
 
+    private static final boolean disableEagerInitialization;
+
     static {
-        final String key = "jdk.internal.lambda.dumpProxyClasses";
-        String path = AccessController.doPrivileged(
-                new GetPropertyAction(key), null,
-                new PropertyPermission(key , "read"));
-        dumper = (null == path) ? null : ProxyClassesDumper.getInstance(path);
+        final String dumpProxyClassesKey = "jdk.internal.lambda.dumpProxyClasses";
+        String dumpPath = GetPropertyAction.privilegedGetProperty(dumpProxyClassesKey);
+        dumper = (null == dumpPath) ? null : ProxyClassesDumper.getInstance(dumpPath);
+
+        final String disableEagerInitializationKey = "jdk.internal.lambda.disableEagerInitialization";
+        disableEagerInitialization = AccessController.doPrivileged(
+            new GetBooleanAction(disableEagerInitializationKey)).booleanValue();
     }
 
     // See context values in AbstractValidatingLambdaMetafactory
     private final String implMethodClassName;        // Name of type containing implementation "CC"
     private final String implMethodName;             // Name of implementation method "impl"
     private final String implMethodDesc;             // Type descriptor for implementation methods "(I)Ljava/lang/String;"
-    private final Class<?> implMethodReturnClass;    // class for implementaion method return type "Ljava/lang/String;"
     private final MethodType constructorType;        // Generated class constructor type "(CC)void"
     private final ClassWriter cw;                    // ASM class writer
     private final String[] argNames;                 // Generated names for the constructor arguments
@@ -155,12 +159,9 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
         super(caller, invokedType, samMethodName, samMethodType,
               implMethod, instantiatedMethodType,
               isSerializable, markerInterfaces, additionalBridges);
-        implMethodClassName = implDefiningClass.getName().replace('.', '/');
+        implMethodClassName = implClass.getName().replace('.', '/');
         implMethodName = implInfo.getName();
-        implMethodDesc = implMethodType.toMethodDescriptorString();
-        implMethodReturnClass = (implKind == MethodHandleInfo.REF_newInvokeSpecial)
-                ? implDefiningClass
-                : implMethodType.returnType();
+        implMethodDesc = implInfo.getMethodType().toMethodDescriptorString();
         constructorType = invokedType.changeReturnType(Void.TYPE);
         lambdaClassName = targetClass.getName().replace('.', '/') + "$$Lambda$" + counter.incrementAndGet();
         cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -192,9 +193,11 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
     @Override
     CallSite buildCallSite() throws LambdaConversionException {
         final Class<?> innerClass = spinInnerClass();
-        if (invokedType.parameterCount() == 0) {
+        if (invokedType.parameterCount() == 0 && !disableEagerInitialization) {
+            // In the case of a non-capturing lambda, we optimize linkage by pre-computing a single instance,
+            // unless we've suppressed eager initialization
             final Constructor<?>[] ctrs = AccessController.doPrivileged(
-                    new PrivilegedAction<Constructor<?>[]>() {
+                    new PrivilegedAction<>() {
                 @Override
                 public Constructor<?>[] run() {
                     Constructor<?>[] ctrs = innerClass.getDeclaredConstructors();
@@ -220,7 +223,9 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
             }
         } else {
             try {
-                UNSAFE.ensureClassInitialized(innerClass);
+                if (!disableEagerInitialization) {
+                    UNSAFE.ensureClassInitialized(innerClass);
+                }
                 return new ConstantCallSite(
                         MethodHandles.Lookup.IMPL_LOOKUP
                              .findStatic(innerClass, NAME_FACTORY, invokedType));
@@ -278,7 +283,7 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
 
         generateConstructor();
 
-        if (invokedType.parameterCount() != 0) {
+        if (invokedType.parameterCount() != 0 || disableEagerInitialization) {
             generateFactory();
         }
 
@@ -311,7 +316,7 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
 
         // If requested, dump out to a file for debugging purposes
         if (dumper != null) {
-            AccessController.doPrivileged(new PrivilegedAction<Void>() {
+            AccessController.doPrivileged(new PrivilegedAction<>() {
                 @Override
                 public Void run() {
                     dumper.dumpClass(lambdaClassName, classBytes);
@@ -469,13 +474,14 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
             // Invoke the method we want to forward to
             visitMethodInsn(invocationOpcode(), implMethodClassName,
                             implMethodName, implMethodDesc,
-                            implDefiningClass.isInterface());
+                            implClass.isInterface());
 
             // Convert the return value (if any) and return it
             // Note: if adapting from non-void to void, the 'return'
             // instruction will pop the unneeded result
+            Class<?> implReturnClass = implMethodType.returnType();
             Class<?> samReturnClass = methodType.returnType();
-            convertType(implMethodReturnClass, samReturnClass, samReturnClass);
+            convertType(implReturnClass, samReturnClass, samReturnClass);
             visitInsn(getReturnOpcode(samReturnClass));
             // Maxs computed by ClassWriter.COMPUTE_MAXS,these arguments ignored
             visitMaxs(-1, -1);
@@ -484,23 +490,13 @@ import static jdk.internal.org.objectweb.asm.Opcodes.*;
 
         private void convertArgumentTypes(MethodType samType) {
             int lvIndex = 0;
-            boolean samIncludesReceiver = implIsInstanceMethod &&
-                                                   invokedType.parameterCount() == 0;
-            int samReceiverLength = samIncludesReceiver ? 1 : 0;
-            if (samIncludesReceiver) {
-                // push receiver
-                Class<?> rcvrType = samType.parameterType(0);
-                visitVarInsn(getLoadOpcode(rcvrType), lvIndex + 1);
-                lvIndex += getParameterSize(rcvrType);
-                convertType(rcvrType, implDefiningClass, instantiatedMethodType.parameterType(0));
-            }
             int samParametersLength = samType.parameterCount();
-            int argOffset = implMethodType.parameterCount() - samParametersLength;
-            for (int i = samReceiverLength; i < samParametersLength; i++) {
+            int captureArity = invokedType.parameterCount();
+            for (int i = 0; i < samParametersLength; i++) {
                 Class<?> argType = samType.parameterType(i);
                 visitVarInsn(getLoadOpcode(argType), lvIndex + 1);
                 lvIndex += getParameterSize(argType);
-                convertType(argType, implMethodType.parameterType(argOffset + i), instantiatedMethodType.parameterType(i));
+                convertType(argType, implMethodType.parameterType(captureArity + i), instantiatedMethodType.parameterType(i));
             }
         }
 

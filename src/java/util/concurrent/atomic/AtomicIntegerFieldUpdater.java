@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -43,8 +43,10 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Objects;
 import java.util.function.IntBinaryOperator;
 import java.util.function.IntUnaryOperator;
-import sun.reflect.CallerSensitive;
-import sun.reflect.Reflection;
+import jdk.internal.misc.Unsafe;
+import jdk.internal.reflect.CallerSensitive;
+import jdk.internal.reflect.Reflection;
+import java.lang.invoke.VarHandle;
 
 /**
  * A reflection-based utility that enables atomic updates to
@@ -59,6 +61,10 @@ import sun.reflect.Reflection;
  * are appropriate for purposes of atomic access, it can
  * guarantee atomicity only with respect to other invocations of
  * {@code compareAndSet} and {@code set} on the same updater.
+ *
+ * <p>Object arguments for parameters of type {@code T} that are not
+ * instances of the class passed to {@link #newUpdater} will result in
+ * a {@link ClassCastException} being thrown.
  *
  * @since 1.5
  * @author Doug Lea
@@ -105,8 +111,6 @@ public abstract class AtomicIntegerFieldUpdater<T> {
      * @param expect the expected value
      * @param update the new value
      * @return {@code true} if successful
-     * @throws ClassCastException if {@code obj} is not an instance
-     * of the class possessing the field established in the constructor
      */
     public abstract boolean compareAndSet(T obj, int expect, int update);
 
@@ -125,8 +129,6 @@ public abstract class AtomicIntegerFieldUpdater<T> {
      * @param expect the expected value
      * @param update the new value
      * @return {@code true} if successful
-     * @throws ClassCastException if {@code obj} is not an instance
-     * of the class possessing the field established in the constructor
      */
     public abstract boolean weakCompareAndSet(T obj, int expect, int update);
 
@@ -151,8 +153,8 @@ public abstract class AtomicIntegerFieldUpdater<T> {
     public abstract void lazySet(T obj, int newValue);
 
     /**
-     * Gets the current value held in the field of the given object managed
-     * by this updater.
+     * Returns the current value held in the field of the given object
+     * managed by this updater.
      *
      * @param obj An object whose field to get
      * @return the current value
@@ -274,10 +276,12 @@ public abstract class AtomicIntegerFieldUpdater<T> {
     }
 
     /**
-     * Atomically updates the field of the given object managed by this updater
-     * with the results of applying the given function, returning the previous
-     * value. The function should be side-effect-free, since it may be
-     * re-applied when attempted updates fail due to contention among threads.
+     * Atomically updates (with memory effects as specified by {@link
+     * VarHandle#compareAndSet}) the field of the given object managed
+     * by this updater with the results of applying the given
+     * function, returning the previous value. The function should be
+     * side-effect-free, since it may be re-applied when attempted
+     * updates fail due to contention among threads.
      *
      * @param obj An object whose field to get and set
      * @param updateFunction a side-effect-free function
@@ -294,10 +298,12 @@ public abstract class AtomicIntegerFieldUpdater<T> {
     }
 
     /**
-     * Atomically updates the field of the given object managed by this updater
-     * with the results of applying the given function, returning the updated
-     * value. The function should be side-effect-free, since it may be
-     * re-applied when attempted updates fail due to contention among threads.
+     * Atomically updates (with memory effects as specified by {@link
+     * VarHandle#compareAndSet}) the field of the given object managed
+     * by this updater with the results of applying the given
+     * function, returning the updated value. The function should be
+     * side-effect-free, since it may be re-applied when attempted
+     * updates fail due to contention among threads.
      *
      * @param obj An object whose field to get and set
      * @param updateFunction a side-effect-free function
@@ -314,13 +320,14 @@ public abstract class AtomicIntegerFieldUpdater<T> {
     }
 
     /**
-     * Atomically updates the field of the given object managed by this
-     * updater with the results of applying the given function to the
-     * current and given values, returning the previous value. The
-     * function should be side-effect-free, since it may be re-applied
-     * when attempted updates fail due to contention among threads.  The
-     * function is applied with the current value as its first argument,
-     * and the given update as the second argument.
+     * Atomically updates (with memory effects as specified by {@link
+     * VarHandle#compareAndSet}) the field of the given object managed
+     * by this updater with the results of applying the given function
+     * to the current and given values, returning the previous value.
+     * The function should be side-effect-free, since it may be
+     * re-applied when attempted updates fail due to contention among
+     * threads.  The function is applied with the current value as its
+     * first argument, and the given update as the second argument.
      *
      * @param obj An object whose field to get and set
      * @param x the update value
@@ -339,13 +346,14 @@ public abstract class AtomicIntegerFieldUpdater<T> {
     }
 
     /**
-     * Atomically updates the field of the given object managed by this
-     * updater with the results of applying the given function to the
-     * current and given values, returning the updated value. The
-     * function should be side-effect-free, since it may be re-applied
-     * when attempted updates fail due to contention among threads.  The
-     * function is applied with the current value as its first argument,
-     * and the given update as the second argument.
+     * Atomically updates (with memory effects as specified by {@link
+     * VarHandle#compareAndSet}) the field of the given object managed
+     * by this updater with the results of applying the given function
+     * to the current and given values, returning the updated value.
+     * The function should be side-effect-free, since it may be
+     * re-applied when attempted updates fail due to contention among
+     * threads.  The function is applied with the current value as its
+     * first argument, and the given update as the second argument.
      *
      * @param obj An object whose field to get and set
      * @param x the update value
@@ -368,7 +376,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
      */
     private static final class AtomicIntegerFieldUpdaterImpl<T>
         extends AtomicIntegerFieldUpdater<T> {
-        private static final sun.misc.Unsafe U = sun.misc.Unsafe.getUnsafe();
+        private static final Unsafe U = Unsafe.getUnsafe();
         private final long offset;
         /**
          * if field is protected, the subclass constructing updater, else
@@ -448,13 +456,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
          */
         private static boolean isSamePackage(Class<?> class1, Class<?> class2) {
             return class1.getClassLoader() == class2.getClassLoader()
-                   && Objects.equals(getPackageName(class1), getPackageName(class2));
-        }
-
-        private static String getPackageName(Class<?> cls) {
-            String cn = cls.getName();
-            int dot = cn.lastIndexOf('.');
-            return (dot != -1) ? cn.substring(0, dot) : "";
+                   && Objects.equals(class1.getPackageName(), class2.getPackageName());
         }
 
         /**
@@ -486,12 +488,12 @@ public abstract class AtomicIntegerFieldUpdater<T> {
 
         public final boolean compareAndSet(T obj, int expect, int update) {
             accessCheck(obj);
-            return U.compareAndSwapInt(obj, offset, expect, update);
+            return U.compareAndSetInt(obj, offset, expect, update);
         }
 
         public final boolean weakCompareAndSet(T obj, int expect, int update) {
             accessCheck(obj);
-            return U.compareAndSwapInt(obj, offset, expect, update);
+            return U.compareAndSetInt(obj, offset, expect, update);
         }
 
         public final void set(T obj, int newValue) {
@@ -501,7 +503,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
 
         public final void lazySet(T obj, int newValue) {
             accessCheck(obj);
-            U.putOrderedInt(obj, offset, newValue);
+            U.putIntRelease(obj, offset, newValue);
         }
 
         public final int get(T obj) {

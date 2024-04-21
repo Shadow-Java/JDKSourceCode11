@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.file.attribute;
@@ -94,19 +94,24 @@ import java.io.IOException;
  * <p> Where dynamic access to file attributes is required, the attributes
  * supported by this attribute view are as follows:
  * <blockquote>
- * <table border="1" cellpadding="8" summary="Supported attributes">
+ * <table class="striped">
+ * <caption style="display:none">Supported attributes</caption>
+ * <thead>
  *   <tr>
- *     <th> Name </th>
- *     <th> Type </th>
+ *     <th scope="col"> Name </th>
+ *     <th scope="col"> Type </th>
  *   </tr>
+ * </thead>
+ * <tbody>
  *   <tr>
- *     <td> "acl" </td>
+ *     <th scope="row"> "acl" </th>
  *     <td> {@link List}&lt;{@link AclEntry}&gt; </td>
  *   </tr>
  *   <tr>
- *     <td> "owner" </td>
+ *     <th scope="row"> "owner" </th>
  *     <td> {@link UserPrincipal} </td>
  *   </tr>
+ * </tbody>
  * </table>
  * </blockquote>
  *
@@ -165,7 +170,7 @@ public interface AclFileAttributeView
      *          if an I/O error occurs
      * @throws  SecurityException
      *          In the case of the default provider, a security manager is
-     *          installed, and it denies {@link RuntimePermission}<tt>("accessUserInformation")</tt>
+     *          installed, and it denies {@link RuntimePermission}{@code ("accessUserInformation")}
      *          or its {@link SecurityManager#checkRead(String) checkRead} method
      *          denies read access to the file.
      */
@@ -201,7 +206,7 @@ public interface AclFileAttributeView
      *          if an I/O error occurs or the ACL is invalid
      * @throws  SecurityException
      *          In the case of the default provider, a security manager is
-     *          installed, it denies {@link RuntimePermission}<tt>("accessUserInformation")</tt>
+     *          installed, it denies {@link RuntimePermission}{@code ("accessUserInformation")}
      *          or its {@link SecurityManager#checkWrite(String) checkWrite}
      *          method denies write access to the file.
      */

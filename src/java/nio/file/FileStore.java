@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2007, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2007, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.file;
@@ -110,6 +110,31 @@ public abstract class FileStore {
      *          if an I/O error occurs
      */
     public abstract long getUsableSpace() throws IOException;
+
+    /**
+     * Returns the number of bytes per block in this file store.
+     *
+     * <p> File storage is typically organized into discrete sequences of bytes
+     * called <i>blocks</i>. A block is the smallest storage unit of a file store.
+     * Every read and write operation is performed on a multiple of blocks.
+     *
+     * @implSpec The implementation in this class throws an
+     *         {@code UnsupportedOperationException}.
+     *
+     * @return  a positive value representing the block size of this file store,
+     *          in bytes
+     *
+     * @throws  IOException
+     *          if an I/O error occurs
+     *
+     * @throws  UnsupportedOperationException
+     *          if the operation is not supported
+     *
+     * @since 10
+     */
+    public long getBlockSize() throws IOException {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Returns the number of unallocated bytes in the file store.
@@ -208,7 +233,7 @@ public abstract class FileStore {
      * @param   attribute
      *          the attribute to read
 
-     * @return  the attribute value; {@code null} may be a valid valid for some
+     * @return  the attribute value; {@code null} may be valid for some
      *          attributes
      *
      * @throws  UnsupportedOperationException

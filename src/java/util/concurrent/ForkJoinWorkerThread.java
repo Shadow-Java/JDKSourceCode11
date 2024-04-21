@@ -1,32 +1,32 @@
 /*
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
@@ -36,6 +36,8 @@
 package java.util.concurrent;
 
 import java.security.AccessControlContext;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 
 /**
@@ -47,7 +49,9 @@ import java.security.ProtectionDomain;
  * and termination methods surrounding the main task processing loop.
  * If you do create such a subclass, you will also need to supply a
  * custom {@link ForkJoinPool.ForkJoinWorkerThreadFactory} to
- * {@linkplain ForkJoinPool#ForkJoinPool use it} in a {@code ForkJoinPool}.
+ * {@linkplain ForkJoinPool#ForkJoinPool(int, ForkJoinWorkerThreadFactory,
+ * UncaughtExceptionHandler, boolean, int, int, int, Predicate, long, TimeUnit)
+ * use it} in a {@code ForkJoinPool}.
  *
  * @since 1.7
  * @author Doug Lea
@@ -66,12 +70,18 @@ public class ForkJoinWorkerThread extends Thread {
      * owning thread.
      *
      * Support for (non-public) subclass InnocuousForkJoinWorkerThread
-     * requires that we break quite a lot of encapsulation (via Unsafe)
-     * both here and in the subclass to access and set Thread fields.
+     * requires that we break quite a lot of encapsulation (via helper
+     * methods in ThreadLocalRandom) both here and in the subclass to
+     * access and set Thread fields.
      */
 
     final ForkJoinPool pool;                // the pool this thread works in
     final ForkJoinPool.WorkQueue workQueue; // work-stealing mechanics
+
+    /** An AccessControlContext supporting no privileges */
+    private static final AccessControlContext INNOCUOUS_ACC =
+        new AccessControlContext(
+            new ProtectionDomain[] { new ProtectionDomain(null, null) });
 
     /**
      * Creates a ForkJoinWorkerThread operating in the given pool.
@@ -87,13 +97,29 @@ public class ForkJoinWorkerThread extends Thread {
     }
 
     /**
-     * Version for InnocuousForkJoinWorkerThread
+     * Version for use by the default pool.  Supports setting the
+     * context class loader.  This is a separate constructor to avoid
+     * affecting the protected constructor.
      */
-    ForkJoinWorkerThread(ForkJoinPool pool, ThreadGroup threadGroup,
+    ForkJoinWorkerThread(ForkJoinPool pool, ClassLoader ccl) {
+        super("aForkJoinWorkerThread");
+        super.setContextClassLoader(ccl);
+        ThreadLocalRandom.setInheritedAccessControlContext(this, INNOCUOUS_ACC);
+        this.pool = pool;
+        this.workQueue = pool.registerWorker(this);
+    }
+
+    /**
+     * Version for InnocuousForkJoinWorkerThread.
+     */
+    ForkJoinWorkerThread(ForkJoinPool pool,
+                         ClassLoader ccl,
+                         ThreadGroup threadGroup,
                          AccessControlContext acc) {
         super(threadGroup, null, "aForkJoinWorkerThread");
-        U.putOrderedObject(this, INHERITEDACCESSCONTROLCONTEXT, acc);
-        eraseThreadLocals(); // clear before registering
+        super.setContextClassLoader(ccl);
+        ThreadLocalRandom.setInheritedAccessControlContext(this, acc);
+        ThreadLocalRandom.eraseThreadLocals(this); // clear before registering
         this.pool = pool;
         this.workQueue = pool.registerWorker(this);
     }
@@ -171,69 +197,39 @@ public class ForkJoinWorkerThread extends Thread {
     }
 
     /**
-     * Erases ThreadLocals by nulling out Thread maps.
-     */
-    final void eraseThreadLocals() {
-        U.putObject(this, THREADLOCALS, null);
-        U.putObject(this, INHERITABLETHREADLOCALS, null);
-    }
-
-    /**
-     * Non-public hook method for InnocuousForkJoinWorkerThread
+     * Non-public hook method for InnocuousForkJoinWorkerThread.
      */
     void afterTopLevelExec() {
     }
 
-    // Set up to allow setting thread fields in constructor
-    private static final sun.misc.Unsafe U;
-    private static final long THREADLOCALS;
-    private static final long INHERITABLETHREADLOCALS;
-    private static final long INHERITEDACCESSCONTROLCONTEXT;
-    static {
-        try {
-            U = sun.misc.Unsafe.getUnsafe();
-            Class<?> tk = Thread.class;
-            THREADLOCALS = U.objectFieldOffset
-                (tk.getDeclaredField("threadLocals"));
-            INHERITABLETHREADLOCALS = U.objectFieldOffset
-                (tk.getDeclaredField("inheritableThreadLocals"));
-            INHERITEDACCESSCONTROLCONTEXT = U.objectFieldOffset
-                (tk.getDeclaredField("inheritedAccessControlContext"));
-
-        } catch (Exception e) {
-            throw new Error(e);
-        }
-    }
-
     /**
      * A worker thread that has no permissions, is not a member of any
-     * user-defined ThreadGroup, and erases all ThreadLocals after
+     * user-defined ThreadGroup, uses the system class loader as
+     * thread context class loader, and erases all ThreadLocals after
      * running each top-level task.
      */
     static final class InnocuousForkJoinWorkerThread extends ForkJoinWorkerThread {
         /** The ThreadGroup for all InnocuousForkJoinWorkerThreads */
         private static final ThreadGroup innocuousThreadGroup =
-            createThreadGroup();
-
-        /** An AccessControlContext supporting no privileges */
-        private static final AccessControlContext INNOCUOUS_ACC =
-            new AccessControlContext(
-                new ProtectionDomain[] {
-                    new ProtectionDomain(null, null)
-                });
+            AccessController.doPrivileged(new PrivilegedAction<>() {
+                public ThreadGroup run() {
+                    ThreadGroup group = Thread.currentThread().getThreadGroup();
+                    for (ThreadGroup p; (p = group.getParent()) != null; )
+                        group = p;
+                    return new ThreadGroup(
+                        group, "InnocuousForkJoinWorkerThreadGroup");
+                }});
 
         InnocuousForkJoinWorkerThread(ForkJoinPool pool) {
-            super(pool, innocuousThreadGroup, INNOCUOUS_ACC);
+            super(pool,
+                  ClassLoader.getSystemClassLoader(),
+                  innocuousThreadGroup,
+                  INNOCUOUS_ACC);
         }
 
         @Override // to erase ThreadLocals
         void afterTopLevelExec() {
-            eraseThreadLocals();
-        }
-
-        @Override // to always report system loader
-        public ClassLoader getContextClassLoader() {
-            return ClassLoader.getSystemClassLoader();
+            ThreadLocalRandom.eraseThreadLocals(this);
         }
 
         @Override // to silently fail
@@ -243,34 +239,5 @@ public class ForkJoinWorkerThread extends Thread {
         public void setContextClassLoader(ClassLoader cl) {
             throw new SecurityException("setContextClassLoader");
         }
-
-        /**
-         * Returns a new group with the system ThreadGroup (the
-         * topmost, parent-less group) as parent.  Uses Unsafe to
-         * traverse Thread.group and ThreadGroup.parent fields.
-         */
-        private static ThreadGroup createThreadGroup() {
-            try {
-                sun.misc.Unsafe u = sun.misc.Unsafe.getUnsafe();
-                Class<?> tk = Thread.class;
-                Class<?> gk = ThreadGroup.class;
-                long tg = u.objectFieldOffset(tk.getDeclaredField("group"));
-                long gp = u.objectFieldOffset(gk.getDeclaredField("parent"));
-                ThreadGroup group = (ThreadGroup)
-                    u.getObject(Thread.currentThread(), tg);
-                while (group != null) {
-                    ThreadGroup parent = (ThreadGroup)u.getObject(group, gp);
-                    if (parent == null)
-                        return new ThreadGroup(group,
-                                               "InnocuousForkJoinWorkerThreadGroup");
-                    group = parent;
-                }
-            } catch (Exception e) {
-                throw new Error(e);
-            }
-            // fall through if null as cannot-happen safeguard
-            throw new Error("Cannot create ThreadGroup");
-        }
     }
-
 }

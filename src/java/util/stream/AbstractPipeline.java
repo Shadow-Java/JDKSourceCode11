@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.util.stream;
 
@@ -327,6 +327,9 @@ abstract class AbstractPipeline<E_IN, E_OUT, S extends BaseStream<E_OUT, S>>
     @Override
     @SuppressWarnings("unchecked")
     public S onClose(Runnable closeHandler) {
+        if (linkedOrConsumed)
+            throw new IllegalStateException(MSG_STREAM_LINKED);
+        Objects.requireNonNull(closeHandler);
         Runnable existingHandler = sourceStage.sourceCloseAction;
         sourceStage.sourceCloseAction =
                 (existingHandler == null)
@@ -488,15 +491,17 @@ abstract class AbstractPipeline<E_IN, E_OUT, S extends BaseStream<E_OUT, S>>
 
     @Override
     @SuppressWarnings("unchecked")
-    final <P_IN> void copyIntoWithCancel(Sink<P_IN> wrappedSink, Spliterator<P_IN> spliterator) {
+    final <P_IN> boolean copyIntoWithCancel(Sink<P_IN> wrappedSink, Spliterator<P_IN> spliterator) {
         @SuppressWarnings({"rawtypes","unchecked"})
         AbstractPipeline p = AbstractPipeline.this;
         while (p.depth > 0) {
             p = p.previousStage;
         }
+
         wrappedSink.begin(spliterator.getExactSizeIfKnown());
-        p.forEachWithCancel(spliterator, wrappedSink);
+        boolean cancelled = p.forEachWithCancel(spliterator, wrappedSink);
         wrappedSink.end();
+        return cancelled;
     }
 
     @Override
@@ -601,8 +606,9 @@ abstract class AbstractPipeline<E_IN, E_OUT, S extends BaseStream<E_OUT, S>>
      *
      * @param spliterator the spliterator to pull elements from
      * @param sink the sink to push elements to
+     * @return true if the cancellation was requested
      */
-    abstract void forEachWithCancel(Spliterator<E_OUT> spliterator, Sink<E_OUT> sink);
+    abstract boolean forEachWithCancel(Spliterator<E_OUT> spliterator, Sink<E_OUT> sink);
 
     /**
      * Make a node builder compatible with this stream shape.

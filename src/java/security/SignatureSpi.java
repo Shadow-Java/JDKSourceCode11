@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1997, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.security;
@@ -38,12 +38,13 @@ import sun.security.jca.JCAUtil;
  * for the {@code Signature} class, which is used to provide the
  * functionality of a digital signature algorithm. Digital signatures are used
  * for authentication and integrity assurance of digital data.
- *.
+ *
  * <p> All the abstract methods in this class must be implemented by each
  * cryptographic service provider who wishes to supply the implementation
  * of a particular signature algorithm.
  *
  * @author Benjamin Renaud
+ * @since 1.2
  *
  *
  * @see Signature
@@ -68,6 +69,33 @@ public abstract class SignatureSpi {
      */
     protected abstract void engineInitVerify(PublicKey publicKey)
         throws InvalidKeyException;
+
+    /**
+     * Initializes this signature object with the specified
+     * public key for verification operations.
+     *
+     * @param publicKey the public key of the identity whose signature is
+     * going to be verified.
+     * @param params the parameters for generating this signature
+     *
+     * @exception InvalidKeyException if the key is improperly
+     * encoded, does not work with the given parameters, and so on.
+     * @exception InvalidAlgorithmParameterException if the given parameters
+     * is invalid.
+     */
+    void engineInitVerify(PublicKey publicKey,
+            AlgorithmParameterSpec params)
+            throws InvalidKeyException, InvalidAlgorithmParameterException {
+        if (params != null) {
+            try {
+                engineSetParameter(params);
+            } catch (UnsupportedOperationException usoe) {
+                // error out if not overrridden
+                throw new InvalidAlgorithmParameterException(usoe);
+            }
+        }
+        engineInitVerify(publicKey);
+    }
 
     /**
      * Initializes this signature object with the specified
@@ -97,10 +125,41 @@ public abstract class SignatureSpi {
      * encoded, parameters are missing, and so on.
      */
     protected void engineInitSign(PrivateKey privateKey,
-                                  SecureRandom random)
-        throws InvalidKeyException {
-            this.appRandom = random;
-            engineInitSign(privateKey);
+            SecureRandom random)
+            throws InvalidKeyException {
+        this.appRandom = random;
+        engineInitSign(privateKey);
+    }
+
+    /**
+     * Initializes this signature object with the specified
+     * private key and source of randomness for signing operations.
+     *
+     * <p>This concrete method has been added to this previously-defined
+     * abstract class. (For backwards compatibility, it cannot be abstract.)
+     *
+     * @param privateKey the private key of the identity whose signature
+     * will be generated.
+     * @param params the parameters for generating this signature
+     * @param random the source of randomness
+     *
+     * @exception InvalidKeyException if the key is improperly
+     * encoded, parameters are missing, and so on.
+     * @exception InvalidAlgorithmParameterException if the parameters is
+     * invalid.
+     */
+    void engineInitSign(PrivateKey privateKey,
+            AlgorithmParameterSpec params, SecureRandom random)
+            throws InvalidKeyException, InvalidAlgorithmParameterException {
+        if (params != null) {
+            try {
+                engineSetParameter(params);
+            } catch (UnsupportedOperationException usoe) {
+                // error out if not overrridden
+                throw new InvalidAlgorithmParameterException(usoe);
+            }
+        }
+        engineInitSign(privateKey, random);
     }
 
     /**
@@ -126,12 +185,12 @@ public abstract class SignatureSpi {
      * properly
      */
     protected abstract void engineUpdate(byte[] b, int off, int len)
-        throws SignatureException;
+            throws SignatureException;
 
     /**
      * Updates the data to be signed or verified using the specified
      * ByteBuffer. Processes the {@code data.remaining()} bytes
-     * starting at at {@code data.position()}.
+     * starting at {@code data.position()}.
      * Upon return, the buffer's position will be equal to its limit;
      * its limit will not have changed.
      *
@@ -222,7 +281,7 @@ public abstract class SignatureSpi {
      * @since 1.2
      */
     protected int engineSign(byte[] outbuf, int offset, int len)
-                        throws SignatureException {
+             throws SignatureException {
         byte[] sig = engineSign();
         if (len < sig.length) {
                 throw new SignatureException
@@ -250,7 +309,7 @@ public abstract class SignatureSpi {
      * process the input data provided, etc.
      */
     protected abstract boolean engineVerify(byte[] sigBytes)
-        throws SignatureException;
+            throws SignatureException;
 
     /**
      * Verifies the passed-in signature in the specified array
@@ -272,7 +331,7 @@ public abstract class SignatureSpi {
      * @since 1.4
      */
     protected boolean engineVerify(byte[] sigBytes, int offset, int length)
-        throws SignatureException {
+            throws SignatureException {
         byte[] sigBytesCopy = new byte[length];
         System.arraycopy(sigBytes, offset, sigBytesCopy, 0, length);
         return engineVerify(sigBytesCopy);
@@ -304,7 +363,7 @@ public abstract class SignatureSpi {
      */
     @Deprecated
     protected abstract void engineSetParameter(String param, Object value)
-        throws InvalidParameterException;
+            throws InvalidParameterException;
 
     /**
      * <p>This method is overridden by providers to initialize
@@ -320,23 +379,23 @@ public abstract class SignatureSpi {
      * are inappropriate for this signature engine
      */
     protected void engineSetParameter(AlgorithmParameterSpec params)
-        throws InvalidAlgorithmParameterException {
-            throw new UnsupportedOperationException();
+            throws InvalidAlgorithmParameterException {
+        throw new UnsupportedOperationException();
     }
 
     /**
-     * <p>This method is overridden by providers to return the
-     * parameters used with this signature engine, or null
-     * if this signature engine does not use any parameters.
+     * <p>This method is overridden by providers to return the parameters
+     * used with this signature engine.
      *
-     * <p>The returned parameters may be the same that were used to initialize
-     * this signature engine, or may contain a combination of default and
-     * randomly generated parameter values used by the underlying signature
-     * implementation if this signature engine requires algorithm parameters
-     * but was not initialized with any.
+     * <p> If this signature engine has been previously initialized with
+     * parameters (by calling the {@code engineSetParameter} method), this
+     * method returns the same parameters. If this signature engine has not been
+     * initialized with parameters, this method may return a combination of
+     * default and randomly generated parameter values if the underlying
+     * signature implementation supports it and can successfully generate
+     * them. Otherwise, {@code null} is returned.
      *
-     * @return the parameters used with this signature engine, or null if this
-     * signature engine does not use any parameters
+     * @return the parameters used with this signature engine, or {@code null}
      *
      * @exception UnsupportedOperationException if this method is
      * not overridden by a provider
@@ -359,7 +418,7 @@ public abstract class SignatureSpi {
      *
      * @param param the string name of the parameter.
      *
-     * @return the object that represents the parameter value, or null if
+     * @return the object that represents the parameter value, or {@code null} if
      * there is none.
      *
      * @exception InvalidParameterException if {@code param} is an

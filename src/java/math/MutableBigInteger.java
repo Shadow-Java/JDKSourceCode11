@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1999, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1999, 2020, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.math;
@@ -254,7 +254,7 @@ class MutableBigInteger {
     /**
      * Compare the magnitude of two MutableBigIntegers. Returns -1, 0 or 1
      * as this MutableBigInteger is numerically less than, equal to, or
-     * greater than <tt>b</tt>.
+     * greater than {@code b}.
      */
     final int compare(MutableBigInteger b) {
         int blen = b.intLen;
@@ -1867,6 +1867,96 @@ class MutableBigInteger {
     }
 
     /**
+     * Calculate the integer square root {@code floor(sqrt(this))} where
+     * {@code sqrt(.)} denotes the mathematical square root. The contents of
+     * {@code this} are <b>not</b> changed. The value of {@code this} is assumed
+     * to be non-negative.
+     *
+     * @implNote The implementation is based on the material in Henry S. Warren,
+     * Jr., <i>Hacker's Delight (2nd ed.)</i> (Addison Wesley, 2013), 279-282.
+     *
+     * @throws ArithmeticException if the value returned by {@code bitLength()}
+     * overflows the range of {@code int}.
+     * @return the integer square root of {@code this}
+     * @since 9
+     */
+    MutableBigInteger sqrt() {
+        // Special cases.
+        if (this.isZero()) {
+            return new MutableBigInteger(0);
+        } else if (this.value.length == 1
+                && (this.value[0] & LONG_MASK) < 4) { // result is unity
+            return ONE;
+        }
+
+        if (bitLength() <= 63) {
+            // Initial estimate is the square root of the positive long value.
+            long v = new BigInteger(this.value, 1).longValueExact();
+            long xk = (long)Math.floor(Math.sqrt(v));
+
+            // Refine the estimate.
+            do {
+                long xk1 = (xk + v/xk)/2;
+
+                // Terminate when non-decreasing.
+                if (xk1 >= xk) {
+                    return new MutableBigInteger(new int[] {
+                        (int)(xk >>> 32), (int)(xk & LONG_MASK)
+                    });
+                }
+
+                xk = xk1;
+            } while (true);
+        } else {
+            // Set up the initial estimate of the iteration.
+
+            // Obtain the bitLength > 63.
+            int bitLength = (int) this.bitLength();
+            if (bitLength != this.bitLength()) {
+                throw new ArithmeticException("bitLength() integer overflow");
+            }
+
+            // Determine an even valued right shift into positive long range.
+            int shift = bitLength - 63;
+            if (shift % 2 == 1) {
+                shift++;
+            }
+
+            // Shift the value into positive long range.
+            MutableBigInteger xk = new MutableBigInteger(this);
+            xk.rightShift(shift);
+            xk.normalize();
+
+            // Use the square root of the shifted value as an approximation.
+            double d = new BigInteger(xk.value, 1).doubleValue();
+            BigInteger bi = BigInteger.valueOf((long)Math.ceil(Math.sqrt(d)));
+            xk = new MutableBigInteger(bi.mag);
+
+            // Shift the approximate square root back into the original range.
+            xk.leftShift(shift / 2);
+
+            // Refine the estimate.
+            MutableBigInteger xk1 = new MutableBigInteger();
+            do {
+                // xk1 = (xk + n/xk)/2
+                this.divide(xk, xk1, false);
+                xk1.add(xk);
+                xk1.rightShift(1);
+
+                // Terminate when non-decreasing.
+                if (xk1.compare(xk) >= 0) {
+                    return xk;
+                }
+
+                // xk = xk1
+                xk.copyValue(xk1);
+
+                xk1.reset();
+            } while (true);
+        }
+    }
+
+    /**
      * Calculate GCD of this and b. This and b are changed by the computation.
      */
     MutableBigInteger hybridGCD(MutableBigInteger b) {
@@ -2088,8 +2178,8 @@ class MutableBigInteger {
     }
 
     /**
-     * Calculate the multiplicative inverse of this mod mod, where mod is odd.
-     * This and mod are not changed by the calculation.
+     * Calculate the multiplicative inverse of this modulo mod, where the mod
+     * argument is odd.  This and mod are not changed by the calculation.
      *
      * This method implements an algorithm due to Richard Schroeppel, that uses
      * the same intermediate representation as Montgomery Reduction
@@ -2143,8 +2233,18 @@ class MutableBigInteger {
             k += trailingZeros;
         }
 
-        while (c.sign < 0)
-           c.signedAdd(p);
+        if (c.compare(p) >= 0) { // c has a larger magnitude than p
+            MutableBigInteger remainder = c.divide(p,
+                new MutableBigInteger());
+            // The previous line ignores the sign so we copy the data back
+            // into c which will restore the sign as needed (and converts
+            // it back to a SignedMutableBigInteger)
+            c.copyValue(remainder);
+        }
+
+        if (c.sign < 0) {
+            c.signedAdd(p);
+        }
 
         return fixup(c, p, k);
     }
@@ -2182,8 +2282,8 @@ class MutableBigInteger {
         }
 
         // In theory, c may be greater than p at this point (Very rare!)
-        while (c.compare(p) >= 0)
-            c.subtract(p);
+        if (c.compare(p) >= 0)
+            c = c.divide(p, new MutableBigInteger());
 
         return c;
     }

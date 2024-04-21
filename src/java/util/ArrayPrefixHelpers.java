@@ -1,41 +1,46 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
-package java.util;
 
 /*
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
+ *
  * Written by Doug Lea with assistance from members of JCP JSR-166
  * Expert Group and released to the public domain, as explained at
  * http://creativecommons.org/publicdomain/zero/1.0/
  */
 
-import java.util.concurrent.ForkJoinPool;
+package java.util;
+
 import java.util.concurrent.CountedCompleter;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.BinaryOperator;
+import java.util.function.DoubleBinaryOperator;
 import java.util.function.IntBinaryOperator;
 import java.util.function.LongBinaryOperator;
-import java.util.function.DoubleBinaryOperator;
 
 /**
  * ForkJoin tasks to perform Arrays.parallelPrefix operations.
@@ -44,7 +49,7 @@ import java.util.function.DoubleBinaryOperator;
  * @since 1.8
  */
 class ArrayPrefixHelpers {
-    private ArrayPrefixHelpers() {}; // non-instantiable
+    private ArrayPrefixHelpers() {} // non-instantiable
 
     /*
      * Parallel prefix (aka cumulate, scan) task classes
@@ -85,7 +90,7 @@ class ArrayPrefixHelpers {
      *
      * As usual for this sort of utility, there are 4 versions, that
      * are simple copy/paste/adapt variants of each other.  (The
-     * double and int versions differ from long version soley by
+     * double and int versions differ from long version solely by
      * replacing "long" (with case-matching)).
      */
 
@@ -113,8 +118,8 @@ class ArrayPrefixHelpers {
             this.lo = this.origin = lo; this.hi = this.fence = hi;
             int p;
             this.threshold =
-                    (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
-                    <= MIN_PARTITION ? MIN_PARTITION : p;
+                (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
+                <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
         /** Subtask constructor */
@@ -128,7 +133,6 @@ class ArrayPrefixHelpers {
             this.lo = lo; this.hi = hi;
         }
 
-        @SuppressWarnings("unchecked")
         public final void compute() {
             final BinaryOperator<T> fn;
             final T[] a;
@@ -142,9 +146,9 @@ class ArrayPrefixHelpers {
                     if (lt == null) {                // first pass
                         int mid = (l + h) >>> 1;
                         f = rt = t.right =
-                                new CumulateTask<T>(t, fn, a, org, fnc, th, mid, h);
-                        t = lt = t.left  =
-                                new CumulateTask<T>(t, fn, a, org, fnc, th, l, mid);
+                            new CumulateTask<T>(t, fn, a, org, fnc, th, mid, h);
+                        t = lt = t.left =
+                            new CumulateTask<T>(t, fn, a, org, fnc, th, l, mid);
                     }
                     else {                           // possibly refork
                         T pin = t.in;
@@ -184,7 +188,7 @@ class ArrayPrefixHelpers {
                     for (int b;;) {
                         if (((b = t.getPendingCount()) & FINISHED) != 0)
                             break outer;                      // already done
-                        state = ((b & CUMULATE) != 0? FINISHED :
+                        state = ((b & CUMULATE) != 0 ? FINISHED :
                                  (l > org) ? SUMMED : (SUMMED|FINISHED));
                         if (t.compareAndSetPendingCount(b, b|state))
                             break;
@@ -213,7 +217,9 @@ class ArrayPrefixHelpers {
                         sum = t.in;
                     t.out = sum;
                     for (CumulateTask<T> par;;) {             // propagate
-                        if ((par = (CumulateTask<T>)t.getCompleter()) == null) {
+                        @SuppressWarnings("unchecked") CumulateTask<T> partmp
+                            = (CumulateTask<T>)t.getCompleter();
+                        if ((par = partmp) == null) {
                             if ((state & FINISHED) != 0)      // enable join
                                 t.quietlyComplete();
                             break outer;
@@ -245,6 +251,7 @@ class ArrayPrefixHelpers {
                 }
             }
         }
+        private static final long serialVersionUID = 5293554502939613543L;
     }
 
     static final class LongCumulateTask extends CountedCompleter<Void> {
@@ -263,8 +270,8 @@ class ArrayPrefixHelpers {
             this.lo = this.origin = lo; this.hi = this.fence = hi;
             int p;
             this.threshold =
-                    (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
-                    <= MIN_PARTITION ? MIN_PARTITION : p;
+                (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
+                <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
         /** Subtask constructor */
@@ -291,9 +298,9 @@ class ArrayPrefixHelpers {
                     if (lt == null) {                // first pass
                         int mid = (l + h) >>> 1;
                         f = rt = t.right =
-                                new LongCumulateTask(t, fn, a, org, fnc, th, mid, h);
-                        t = lt = t.left  =
-                                new LongCumulateTask(t, fn, a, org, fnc, th, l, mid);
+                            new LongCumulateTask(t, fn, a, org, fnc, th, mid, h);
+                        t = lt = t.left =
+                            new LongCumulateTask(t, fn, a, org, fnc, th, l, mid);
                     }
                     else {                           // possibly refork
                         long pin = t.in;
@@ -333,7 +340,7 @@ class ArrayPrefixHelpers {
                     for (int b;;) {
                         if (((b = t.getPendingCount()) & FINISHED) != 0)
                             break outer;                      // already done
-                        state = ((b & CUMULATE) != 0? FINISHED :
+                        state = ((b & CUMULATE) != 0 ? FINISHED :
                                  (l > org) ? SUMMED : (SUMMED|FINISHED));
                         if (t.compareAndSetPendingCount(b, b|state))
                             break;
@@ -394,6 +401,7 @@ class ArrayPrefixHelpers {
                 }
             }
         }
+        private static final long serialVersionUID = -5074099945909284273L;
     }
 
     static final class DoubleCumulateTask extends CountedCompleter<Void> {
@@ -412,8 +420,8 @@ class ArrayPrefixHelpers {
             this.lo = this.origin = lo; this.hi = this.fence = hi;
             int p;
             this.threshold =
-                    (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
-                    <= MIN_PARTITION ? MIN_PARTITION : p;
+                (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
+                <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
         /** Subtask constructor */
@@ -440,9 +448,9 @@ class ArrayPrefixHelpers {
                     if (lt == null) {                // first pass
                         int mid = (l + h) >>> 1;
                         f = rt = t.right =
-                                new DoubleCumulateTask(t, fn, a, org, fnc, th, mid, h);
-                        t = lt = t.left  =
-                                new DoubleCumulateTask(t, fn, a, org, fnc, th, l, mid);
+                            new DoubleCumulateTask(t, fn, a, org, fnc, th, mid, h);
+                        t = lt = t.left =
+                            new DoubleCumulateTask(t, fn, a, org, fnc, th, l, mid);
                     }
                     else {                           // possibly refork
                         double pin = t.in;
@@ -482,7 +490,7 @@ class ArrayPrefixHelpers {
                     for (int b;;) {
                         if (((b = t.getPendingCount()) & FINISHED) != 0)
                             break outer;                      // already done
-                        state = ((b & CUMULATE) != 0? FINISHED :
+                        state = ((b & CUMULATE) != 0 ? FINISHED :
                                  (l > org) ? SUMMED : (SUMMED|FINISHED));
                         if (t.compareAndSetPendingCount(b, b|state))
                             break;
@@ -543,6 +551,7 @@ class ArrayPrefixHelpers {
                 }
             }
         }
+        private static final long serialVersionUID = -586947823794232033L;
     }
 
     static final class IntCumulateTask extends CountedCompleter<Void> {
@@ -561,8 +570,8 @@ class ArrayPrefixHelpers {
             this.lo = this.origin = lo; this.hi = this.fence = hi;
             int p;
             this.threshold =
-                    (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
-                    <= MIN_PARTITION ? MIN_PARTITION : p;
+                (p = (hi - lo) / (ForkJoinPool.getCommonPoolParallelism() << 3))
+                <= MIN_PARTITION ? MIN_PARTITION : p;
         }
 
         /** Subtask constructor */
@@ -589,9 +598,9 @@ class ArrayPrefixHelpers {
                     if (lt == null) {                // first pass
                         int mid = (l + h) >>> 1;
                         f = rt = t.right =
-                                new IntCumulateTask(t, fn, a, org, fnc, th, mid, h);
-                        t = lt = t.left  =
-                                new IntCumulateTask(t, fn, a, org, fnc, th, l, mid);
+                            new IntCumulateTask(t, fn, a, org, fnc, th, mid, h);
+                        t = lt = t.left =
+                            new IntCumulateTask(t, fn, a, org, fnc, th, l, mid);
                     }
                     else {                           // possibly refork
                         int pin = t.in;
@@ -631,7 +640,7 @@ class ArrayPrefixHelpers {
                     for (int b;;) {
                         if (((b = t.getPendingCount()) & FINISHED) != 0)
                             break outer;                      // already done
-                        state = ((b & CUMULATE) != 0? FINISHED :
+                        state = ((b & CUMULATE) != 0 ? FINISHED :
                                  (l > org) ? SUMMED : (SUMMED|FINISHED));
                         if (t.compareAndSetPendingCount(b, b|state))
                             break;
@@ -692,5 +701,6 @@ class ArrayPrefixHelpers {
                 }
             }
         }
+        private static final long serialVersionUID = 3731755594596840961L;
     }
 }

@@ -1,33 +1,33 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
- *
- *
- *
- *
+ * This file is available under and governed by the GNU General Public
+ * License version 2 only, as published by the Free Software Foundation.
+ * However, the following notice accompanied the original version of this
+ * file:
  *
  * Copyright (c) 2012, Stephen Colebourne & Michael Nascimento Santos
  *
@@ -61,7 +61,12 @@
  */
 package java.time.chrono;
 
+import static java.time.temporal.ChronoField.ERA;
+
 import java.time.DateTimeException;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.TextStyle;
+import java.util.Locale;
 
 /**
  * An era in the Minguo calendar system.
@@ -71,27 +76,28 @@ import java.time.DateTimeException;
  * All previous years, zero or earlier in the proleptic count or one and greater
  * in the year-of-era count, are part of the 'Before Republic of China' era.
  *
- * <table summary="Minguo years and eras" cellpadding="2" cellspacing="3" border="0" >
+ * <table class="striped" style="text-align:left">
+ * <caption style="display:none">Minguo years and eras</caption>
  * <thead>
- * <tr class="tableSubHeadingColor">
- * <th class="colFirst" align="left">year-of-era</th>
- * <th class="colFirst" align="left">era</th>
- * <th class="colFirst" align="left">proleptic-year</th>
- * <th class="colLast" align="left">ISO proleptic-year</th>
+ * <tr>
+ * <th>year-of-era</th>
+ * <th>era</th>
+ * <th>proleptic-year</th>
+ * <th>ISO proleptic-year</th>
  * </tr>
  * </thead>
  * <tbody>
- * <tr class="rowColor">
- * <td>2</td><td>ROC</td><td>2</td><td>1913</td>
+ * <tr>
+ * <td>2</td><td>ROC</td><th scope="row">2</th><td>1913</td>
  * </tr>
- * <tr class="altColor">
- * <td>1</td><td>ROC</td><td>1</td><td>1912</td>
+ * <tr>
+ * <td>1</td><td>ROC</td><th scope="row">1</th><td>1912</td>
  * </tr>
- * <tr class="rowColor">
- * <td>1</td><td>BEFORE_ROC</td><td>0</td><td>1911</td>
+ * <tr>
+ * <td>1</td><td>BEFORE_ROC</td><th scope="row">0</th><td>1911</td>
  * </tr>
- * <tr class="altColor">
- * <td>2</td><td>BEFORE_ROC</td><td>-1</td><td>1910</td>
+ * <tr>
+ * <td>2</td><td>BEFORE_ROC</td><th scope="row">-1</th><td>1910</td>
  * </tr>
  * </tbody>
  * </table>
@@ -150,6 +156,21 @@ public enum MinguoEra implements Era {
     @Override
     public int getValue() {
         return ordinal();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param style {@inheritDoc}
+     * @param locale {@inheritDoc}
+     */
+    @Override
+    public String getDisplayName(TextStyle style, Locale locale) {
+        return new DateTimeFormatterBuilder()
+            .appendText(ERA, style)
+            .toFormatter(locale)
+            .withChronology(MinguoChronology.INSTANCE)
+            .format(this == ROC ? MinguoDate.of(1, 1, 1) : MinguoDate.of(0, 1, 1));
     }
 
 }

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2012, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2012, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.util.stream;
 
@@ -96,11 +96,6 @@ final class SliceOps {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T> IntFunction<T[]> castingArray() {
-        return size -> (T[]) new Object[size];
-    }
-
     /**
      * Appends a "slice" operation to the provided stream.  The slice operation
      * may be may be skip-only, limit-only, or skip-and-limit.
@@ -143,15 +138,15 @@ final class SliceOps {
                             skip, limit, size);
                 }
                 else {
-                    // @@@ OOMEs will occur for LongStream.longs().filter(i -> true).limit(n)
-                    //     regardless of the value of n
+                    // @@@ OOMEs will occur for LongStream.range(0, Long.MAX_VALUE).filter(i -> true).limit(n)
+                    //     when n * parallelismLevel is sufficiently large.
                     //     Need to adjust the target size of splitting for the
                     //     SliceTask from say (size / k) to say min(size / k, 1 << 14)
                     //     This will limit the size of the buffers created at the leaf nodes
                     //     cancellation will be more aggressive cancelling later tasks
                     //     if the target slice size has been reached from a given task,
                     //     cancellation should also clear local results if any
-                    return new SliceTask<>(this, helper, spliterator, castingArray(), skip, limit).
+                    return new SliceTask<>(this, helper, spliterator, Nodes.castingArray(), skip, limit).
                             invoke().spliterator();
                 }
             }
@@ -609,8 +604,15 @@ final class SliceOps {
                 return nb.build();
             }
             else {
-                Node<P_OUT> node = helper.wrapAndCopyInto(helper.makeNodeBuilder(-1, generator),
-                                                          spliterator).build();
+                final Node.Builder<P_OUT> nb = op.makeNodeBuilder(-1, generator);
+                if (targetOffset == 0) { // limit only
+                    Sink<P_OUT> opSink = op.opWrapSink(helper.getStreamAndOpFlags(), nb);
+                    helper.copyIntoWithCancel(helper.wrapSink(opSink), spliterator);
+                }
+                else {
+                    helper.wrapAndCopyInto(nb, spliterator);
+                }
+                Node<P_OUT> node = nb.build();
                 thisNodeSize = node.count();
                 completed = true;
                 spliterator = null;
@@ -693,7 +695,7 @@ final class SliceOps {
          * size.
          *
          * @param target the target size
-         * @return return the number of completed elements
+         * @return the number of completed elements
          */
         private long completedSize(long target) {
             if (completed)

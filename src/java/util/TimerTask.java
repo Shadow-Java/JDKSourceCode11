@@ -1,35 +1,39 @@
 /*
  * Copyright (c) 1999, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util;
 
 /**
- * A task that can be scheduled for one-time or repeated execution by a Timer.
+ * A task that can be scheduled for one-time or repeated execution by a
+ * {@link Timer}.
+ *
+ * <p>A timer task is <em>not</em> reusable.  Once a task has been scheduled
+ * for execution on a {@code Timer} or cancelled, subsequent attempts to
+ * schedule it for execution will throw {@code IllegalStateException}.
  *
  * @author  Josh Bloch
- * @see     Timer
  * @since   1.3
  */
 
@@ -98,7 +102,7 @@ public abstract class TimerTask implements Runnable {
      * will never run again.  (If the task is running when this call occurs,
      * the task will run to completion, but will never run again.)
      *
-     * <p>Note that calling this method from within the <tt>run</tt> method of
+     * <p>Note that calling this method from within the {@code run} method of
      * a repeating timer task absolutely guarantees that the timer task will
      * not run again.
      *
@@ -110,7 +114,7 @@ public abstract class TimerTask implements Runnable {
      *         Returns false if the task was scheduled for one-time execution
      *         and has already run, or if the task was never scheduled, or if
      *         the task was already cancelled.  (Loosely speaking, this method
-     *         returns <tt>true</tt> if it prevents one or more scheduled
+     *         returns {@code true} if it prevents one or more scheduled
      *         executions from taking place.)
      */
     public boolean cancel() {

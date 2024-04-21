@@ -1,29 +1,32 @@
 /*
- * Copyright (c) 2002, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.net;
+
 import java.io.IOException;
+import static java.net.InetAddress.PREFER_IPV6_VALUE;
+import static java.net.InetAddress.PREFER_SYSTEM_VALUE;
 
 /*
  * Package private implementation of InetAddressImpl for dual
@@ -35,15 +38,23 @@ import java.io.IOException;
  *
  * @since 1.4
  */
-
 class Inet6AddressImpl implements InetAddressImpl {
-    public native String getLocalHostName() throws UnknownHostException;
-    public native InetAddress[]
-        lookupAllHostAddr(String hostname) throws UnknownHostException;
-    public native String getHostByAddr(byte[] addr) throws UnknownHostException;
-    private native boolean isReachable0(byte[] addr, int scope, int timeout, byte[] inf, int ttl, int if_scope) throws IOException;
 
-    public boolean isReachable(InetAddress addr, int timeout, NetworkInterface netif, int ttl) throws IOException {
+    public native String getLocalHostName() throws UnknownHostException;
+
+    public native InetAddress[] lookupAllHostAddr(String hostname)
+        throws UnknownHostException;
+
+    public native String getHostByAddr(byte[] addr) throws UnknownHostException;
+
+    private native boolean isReachable0(byte[] addr, int scope, int timeout,
+                                        byte[] inf, int ttl, int if_scope)
+        throws IOException;
+
+    public boolean isReachable(InetAddress addr, int timeout,
+                               NetworkInterface netif, int ttl)
+        throws IOException
+    {
         byte[] ifaddr = null;
         int scope = -1;
         int netif_scope = -1;
@@ -79,7 +90,8 @@ class Inet6AddressImpl implements InetAddressImpl {
 
     public synchronized InetAddress anyLocalAddress() {
         if (anyLocalAddress == null) {
-            if (InetAddress.preferIPv6Address) {
+            if (InetAddress.preferIPv6Address == PREFER_IPV6_VALUE ||
+                InetAddress.preferIPv6Address == PREFER_SYSTEM_VALUE) {
                 anyLocalAddress = new Inet6Address();
                 anyLocalAddress.holder().hostName = "::";
             } else {
@@ -91,7 +103,8 @@ class Inet6AddressImpl implements InetAddressImpl {
 
     public synchronized InetAddress loopbackAddress() {
         if (loopbackAddress == null) {
-             if (InetAddress.preferIPv6Address) {
+             if (InetAddress.preferIPv6Address == PREFER_IPV6_VALUE ||
+                 InetAddress.preferIPv6Address == PREFER_SYSTEM_VALUE) {
                  byte[] loopback =
                         {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
@@ -103,6 +116,6 @@ class Inet6AddressImpl implements InetAddressImpl {
         return loopbackAddress;
     }
 
-    private InetAddress      anyLocalAddress;
-    private InetAddress      loopbackAddress;
+    private InetAddress anyLocalAddress;
+    private InetAddress loopbackAddress;
 }

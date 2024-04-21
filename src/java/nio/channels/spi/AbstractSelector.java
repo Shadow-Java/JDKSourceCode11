@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.nio.channels.spi;
@@ -43,9 +43,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * after, respectively, invoking an I/O operation that might block
  * indefinitely.  In order to ensure that the {@link #end end} method is always
  * invoked, these methods should be used within a
- * <tt>try</tt>&nbsp;...&nbsp;<tt>finally</tt> block:
+ * {@code try}&nbsp;...&nbsp;{@code finally} block:
  *
- * <blockquote><pre>
+ * <blockquote><pre id="be">
  * try {
  *     begin();
  *     // Perform blocking I/O operation here
@@ -70,7 +70,7 @@ public abstract class AbstractSelector
     extends Selector
 {
 
-    private AtomicBoolean selectorOpen = new AtomicBoolean(true);
+    private final AtomicBoolean selectorOpen = new AtomicBoolean(true);
 
     // The provider that created this selector
     private final SelectorProvider provider;
@@ -197,7 +197,7 @@ public abstract class AbstractSelector
      * Marks the beginning of an I/O operation that might block indefinitely.
      *
      * <p> This method should be invoked in tandem with the {@link #end end}
-     * method, using a <tt>try</tt>&nbsp;...&nbsp;<tt>finally</tt> block as
+     * method, using a {@code try}&nbsp;...&nbsp;{@code finally} block as
      * shown <a href="#be">above</a>, in order to implement interruption for
      * this selector.
      *
@@ -223,7 +223,7 @@ public abstract class AbstractSelector
      * Marks the end of an I/O operation that might block indefinitely.
      *
      * <p> This method should be invoked in tandem with the {@link #begin begin}
-     * method, using a <tt>try</tt>&nbsp;...&nbsp;<tt>finally</tt> block as
+     * method, using a {@code try}&nbsp;...&nbsp;{@code finally} block as
      * shown <a href="#be">above</a>, in order to implement interruption for
      * this selector.  </p>
      */

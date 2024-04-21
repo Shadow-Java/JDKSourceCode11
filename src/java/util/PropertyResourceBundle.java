@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2016, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 /*
@@ -40,8 +40,14 @@
 package java.util;
 
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.IOException;
+import java.nio.charset.MalformedInputException;
+import java.nio.charset.UnmappableCharacterException;
+import sun.nio.cs.ISO_8859_1;
+import sun.security.action.GetPropertyAction;
+import sun.util.PropertyResourceBundleCharset;
 import sun.util.ResourceBundleEnumeration;
 
 /**
@@ -57,11 +63,11 @@ import sun.util.ResourceBundleEnumeration;
  * files containing the resource data.  <code>ResourceBundle.getBundle</code>
  * will automatically look for the appropriate properties file and create a
  * <code>PropertyResourceBundle</code> that refers to it. See
- * {@link ResourceBundle#getBundle(java.lang.String, java.util.Locale, java.lang.ClassLoader) ResourceBundle.getBundle}
+ * {@link ResourceBundle#getBundle(String, Locale, ClassLoader) ResourceBundle.getBundle}
  * for a complete description of the search and instantiation strategy.
  *
  * <p>
- * The following <a name="sample">example</a> shows a member of a resource
+ * The following <a id="sample">example</a> shows a member of a resource
  * bundle family with the base name "MyResources".
  * The text defines the bundle "MyResources_de",
  * the German member of the bundle family.
@@ -99,31 +105,59 @@ import sun.util.ResourceBundleEnumeration;
  * </pre>
  * </blockquote>
  *
- * <p>
+ * @apiNote
+ * {@code PropertyResourceBundle} can be constructed either
+ * from an {@code InputStream} or a {@code Reader}, which represents a property file.
+ * Constructing a {@code PropertyResourceBundle} instance from an {@code InputStream}
+ * requires that the input stream be encoded in {@code UTF-8}. By default, if a
+ * {@link java.nio.charset.MalformedInputException} or an
+ * {@link java.nio.charset.UnmappableCharacterException} occurs on reading the
+ * input stream, then the {@code PropertyResourceBundle} instance resets to the state
+ * before the exception, re-reads the input stream in {@code ISO-8859-1}, and
+ * continues reading. If the system property
+ * {@code java.util.PropertyResourceBundle.encoding} is set to either
+ * "ISO-8859-1" or "UTF-8", the input stream is solely read in that encoding,
+ * and throws the exception if it encounters an invalid sequence.
+ * If "ISO-8859-1" is specified, characters that cannot be represented in
+ * ISO-8859-1 encoding must be represented by Unicode Escapes as defined in section
+ * 3.3 of <cite>The Java&trade; Language Specification</cite>
+ * whereas the other constructor which takes a {@code Reader} does not have that limitation.
+ * Other encoding values are ignored for this system property.
+ * The system property is read and evaluated when initializing this class.
+ * Changing or removing the property has no effect after the initialization.
+ *
+ * @implSpec
  * The implementation of a {@code PropertyResourceBundle} subclass must be
  * thread-safe if it's simultaneously used by multiple threads. The default
  * implementations of the non-abstract methods in this class are thread-safe.
  *
- * <p>
- * <strong>Note:</strong> PropertyResourceBundle can be constructed either
- * from an InputStream or a Reader, which represents a property file.
- * Constructing a PropertyResourceBundle instance from an InputStream requires
- * that the input stream be encoded in ISO-8859-1.  In that case, characters
- * that cannot be represented in ISO-8859-1 encoding must be represented by Unicode Escapes
- * as defined in section 3.3 of
- * <cite>The Java&trade; Language Specification</cite>
- * whereas the other constructor which takes a Reader does not have that limitation.
- *
  * @see ResourceBundle
  * @see ListResourceBundle
  * @see Properties
- * @since JDK1.1
+ * @since 1.1
  */
 public class PropertyResourceBundle extends ResourceBundle {
+
+    // Check whether the strict encoding is specified.
+    // The possible encoding is either "ISO-8859-1" or "UTF-8".
+    private static final String encoding = GetPropertyAction
+        .privilegedGetProperty("java.util.PropertyResourceBundle.encoding", "")
+        .toUpperCase(Locale.ROOT);
+
     /**
      * Creates a property resource bundle from an {@link java.io.InputStream
-     * InputStream}.  The property file read with this constructor
-     * must be encoded in ISO-8859-1.
+     * InputStream}. This constructor reads the property file in UTF-8 by default.
+     * If a {@link java.nio.charset.MalformedInputException} or an
+     * {@link java.nio.charset.UnmappableCharacterException} occurs on reading the
+     * input stream, then the PropertyResourceBundle instance resets to the state
+     * before the exception, re-reads the input stream in {@code ISO-8859-1} and
+     * continues reading. If the system property
+     * {@code java.util.PropertyResourceBundle.encoding} is set to either
+     * "ISO-8859-1" or "UTF-8", the input stream is solely read in that encoding,
+     * and throws the exception if it encounters an invalid sequence. Other
+     * encoding values are ignored for this system property.
+     * The system property is read and evaluated when initializing this class.
+     * Changing or removing the property has no effect after the initialization.
      *
      * @param stream an InputStream that represents a property file
      *        to read from.
@@ -131,12 +165,19 @@ public class PropertyResourceBundle extends ResourceBundle {
      * @throws NullPointerException if <code>stream</code> is null
      * @throws IllegalArgumentException if {@code stream} contains a
      *     malformed Unicode escape sequence.
+     * @throws MalformedInputException if the system property
+     *     {@code java.util.PropertyResourceBundle.encoding} is set to "UTF-8"
+     *     and {@code stream} contains an invalid UTF-8 byte sequence.
+     * @throws UnmappableCharacterException if the system property
+     *     {@code java.util.PropertyResourceBundle.encoding} is set to "UTF-8"
+     *     and {@code stream} contains an unmappable UTF-8 byte sequence.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public PropertyResourceBundle (InputStream stream) throws IOException {
-        Properties properties = new Properties();
-        properties.load(stream);
-        lookup = new HashMap(properties);
+        this(new InputStreamReader(stream,
+            "ISO-8859-1".equals(encoding) ?
+                ISO_8859_1.INSTANCE.newDecoder() :
+                new PropertyResourceBundleCharset("UTF-8".equals(encoding)).newDecoder()));
     }
 
     /**
@@ -197,5 +238,5 @@ public class PropertyResourceBundle extends ResourceBundle {
 
     // ==================privates====================
 
-    private Map<String,Object> lookup;
+    private final Map<String,Object> lookup;
 }

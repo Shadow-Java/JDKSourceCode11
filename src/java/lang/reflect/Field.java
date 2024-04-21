@@ -1,33 +1,35 @@
 /*
- * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 1996, 2015, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.reflect;
 
-import sun.reflect.CallerSensitive;
-import sun.reflect.FieldAccessor;
-import sun.reflect.Reflection;
+import jdk.internal.misc.SharedSecrets;
+import jdk.internal.reflect.CallerSensitive;
+import jdk.internal.reflect.FieldAccessor;
+import jdk.internal.reflect.Reflection;
+import jdk.internal.vm.annotation.ForceInline;
 import sun.reflect.generics.repository.FieldRepository;
 import sun.reflect.generics.factory.CoreReflectionFactory;
 import sun.reflect.generics.factory.GenericsFactory;
@@ -58,6 +60,7 @@ import sun.reflect.annotation.TypeAnnotationParser;
  *
  * @author Kenneth Russell
  * @author Nakul Saraiya
+ * @since 1.1
  */
 public final
 class Field extends AccessibleObject implements Member {
@@ -157,9 +160,27 @@ class Field extends AccessibleObject implements Member {
     }
 
     /**
+     * @throws InaccessibleObjectException {@inheritDoc}
+     * @throws SecurityException {@inheritDoc}
+     */
+    @Override
+    @CallerSensitive
+    public void setAccessible(boolean flag) {
+        AccessibleObject.checkPermission();
+        if (flag) checkCanSetAccessible(Reflection.getCallerClass());
+        setAccessible0(flag);
+    }
+
+    @Override
+    void checkCanSetAccessible(Class<?> caller) {
+        checkCanSetAccessible(caller, clazz);
+    }
+
+    /**
      * Returns the {@code Class} object representing the class or interface
      * that declares the field represented by this {@code Field} object.
      */
+    @Override
     public Class<?> getDeclaringClass() {
         return clazz;
     }
@@ -304,6 +325,11 @@ class Field extends AccessibleObject implements Member {
             + getName());
     }
 
+    @Override
+    String toShortString() {
+        return "field " + getDeclaringClass().getTypeName() + "." + getName();
+    }
+
     /**
      * Returns a string describing this {@code Field}, including
      * its generic type.  The format is the access modifiers for the
@@ -381,14 +407,13 @@ class Field extends AccessibleObject implements Member {
      *              by this method fails.
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public Object get(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).get(obj);
     }
@@ -416,14 +441,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public boolean getBoolean(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getBoolean(obj);
     }
@@ -451,14 +475,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public byte getByte(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getByte(obj);
     }
@@ -488,14 +511,13 @@ class Field extends AccessibleObject implements Member {
      * @see Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public char getChar(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getChar(obj);
     }
@@ -525,14 +547,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public short getShort(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getShort(obj);
     }
@@ -562,14 +583,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public int getInt(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getInt(obj);
     }
@@ -599,14 +619,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public long getLong(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getLong(obj);
     }
@@ -636,14 +655,13 @@ class Field extends AccessibleObject implements Member {
      * @see Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public float getFloat(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getFloat(obj);
     }
@@ -673,14 +691,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#get
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public double getDouble(Object obj)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         return getFieldAccessor(obj).getDouble(obj);
     }
@@ -752,14 +769,13 @@ class Field extends AccessibleObject implements Member {
      *              by this method fails.
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void set(Object obj, Object value)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).set(obj, value);
     }
@@ -789,14 +805,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setBoolean(Object obj, boolean z)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setBoolean(obj, z);
     }
@@ -826,14 +841,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setByte(Object obj, byte b)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setByte(obj, b);
     }
@@ -863,14 +877,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setChar(Object obj, char c)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setChar(obj, c);
     }
@@ -900,14 +913,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setShort(Object obj, short s)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setShort(obj, s);
     }
@@ -916,7 +928,7 @@ class Field extends AccessibleObject implements Member {
      * Sets the value of a field as an {@code int} on the specified object.
      * This method is equivalent to
      * {@code set(obj, iObj)},
-     * where {@code iObj} is a {@code Integer} object and
+     * where {@code iObj} is an {@code Integer} object and
      * {@code iObj.intValue() == i}.
      *
      * @param obj the object whose field should be modified
@@ -937,14 +949,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setInt(Object obj, int i)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setInt(obj, i);
     }
@@ -974,14 +985,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setLong(Object obj, long l)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setLong(obj, l);
     }
@@ -1011,14 +1021,13 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setFloat(Object obj, float f)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setFloat(obj, f);
     }
@@ -1048,16 +1057,24 @@ class Field extends AccessibleObject implements Member {
      * @see       Field#set
      */
     @CallerSensitive
+    @ForceInline // to ensure Reflection.getCallerClass optimization
     public void setDouble(Object obj, double d)
         throws IllegalArgumentException, IllegalAccessException
     {
         if (!override) {
-            if (!Reflection.quickCheckMemberAccess(clazz, modifiers)) {
-                Class<?> caller = Reflection.getCallerClass();
-                checkAccess(caller, clazz, obj, modifiers);
-            }
+            Class<?> caller = Reflection.getCallerClass();
+            checkAccess(caller, obj);
         }
         getFieldAccessor(obj).setDouble(obj, d);
+    }
+
+    // check access to field
+    private void checkAccess(Class<?> caller, Object obj)
+        throws IllegalAccessException
+    {
+        checkAccess(caller, clazz,
+                    Modifier.isStatic(modifiers) ? null : obj.getClass(),
+                    modifiers);
     }
 
     // security check is done before calling this method
@@ -1111,6 +1128,11 @@ class Field extends AccessibleObject implements Member {
         }
     }
 
+    @Override
+    Field getRoot() {
+        return root;
+    }
+
     /**
      * @throws NullPointerException {@inheritDoc}
      * @since 1.5
@@ -1139,21 +1161,28 @@ class Field extends AccessibleObject implements Member {
         return AnnotationParser.toArray(declaredAnnotations());
     }
 
-    private transient Map<Class<? extends Annotation>, Annotation> declaredAnnotations;
+    private transient volatile Map<Class<? extends Annotation>, Annotation> declaredAnnotations;
 
-    private synchronized  Map<Class<? extends Annotation>, Annotation> declaredAnnotations() {
-        if (declaredAnnotations == null) {
-            Field root = this.root;
-            if (root != null) {
-                declaredAnnotations = root.declaredAnnotations();
-            } else {
-                declaredAnnotations = AnnotationParser.parseAnnotations(
-                        annotations,
-                        sun.misc.SharedSecrets.getJavaLangAccess().getConstantPool(getDeclaringClass()),
-                        getDeclaringClass());
+    private Map<Class<? extends Annotation>, Annotation> declaredAnnotations() {
+        Map<Class<? extends Annotation>, Annotation> declAnnos;
+        if ((declAnnos = declaredAnnotations) == null) {
+            synchronized (this) {
+                if ((declAnnos = declaredAnnotations) == null) {
+                    Field root = this.root;
+                    if (root != null) {
+                        declAnnos = root.declaredAnnotations();
+                    } else {
+                        declAnnos = AnnotationParser.parseAnnotations(
+                                annotations,
+                                SharedSecrets.getJavaLangAccess()
+                                        .getConstantPool(getDeclaringClass()),
+                                getDeclaringClass());
+                    }
+                    declaredAnnotations = declAnnos;
+                }
             }
         }
-        return declaredAnnotations;
+        return declAnnos;
     }
 
     private native byte[] getTypeAnnotationBytes0();
@@ -1168,7 +1197,7 @@ class Field extends AccessibleObject implements Member {
      */
     public AnnotatedType getAnnotatedType() {
         return TypeAnnotationParser.buildAnnotatedType(getTypeAnnotationBytes0(),
-                                                       sun.misc.SharedSecrets.getJavaLangAccess().
+                                                       SharedSecrets.getJavaLangAccess().
                                                            getConstantPool(getDeclaringClass()),
                                                        this,
                                                        getDeclaringClass(),

@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2000, 2020, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 // -- This file was mechanically generated: Do not edit! -- //
@@ -35,6 +35,8 @@ package java.nio;
 
 
 
+
+import jdk.internal.util.ArraysSupport;
 
 /**
  * A byte buffer.
@@ -70,8 +72,7 @@ package java.nio;
  *
 
  *
- *   <li><p> Methods for {@link #compact compacting}, {@link
- *   #duplicate duplicating}, and {@link #slice slicing}
+ *   <li><p> A method for {@link #compact compacting}
  *   a byte buffer.  </p></li>
  *
  * </ul>
@@ -94,7 +95,7 @@ package java.nio;
  *
 
  *
- * <a name="direct"></a>
+ * <a id="direct"></a>
  * <h2> Direct <i>vs.</i> non-direct buffers </h2>
  *
  * <p> A byte buffer is either <i>direct</i> or <i>non-direct</i>.  Given a
@@ -129,11 +130,11 @@ package java.nio;
  * that explicit buffer management can be done in performance-critical code.
  *
  *
- * <a name="bin"></a>
+ * <a id="bin"></a>
  * <h2> Access to binary data </h2>
  *
  * <p> This class defines methods for reading and writing values of all other
- * primitive types, except <tt>boolean</tt>.  Primitive values are translated
+ * primitive types, except {@code boolean}.  Primitive values are translated
  * to (or from) sequences of bytes according to the buffer's current byte
  * order, which may be retrieved and modified via the {@link #order order}
  * methods.  Specific byte orders are represented by instances of the {@link
@@ -151,12 +152,12 @@ package java.nio;
  *  void  {@link #putFloat(float) putFloat(float f)}
  *  void  {@link #putFloat(int,float) putFloat(int index, float f)}</pre></blockquote>
  *
- * <p> Corresponding methods are defined for the types <tt>char</tt>,
- * <tt>short</tt>, <tt>int</tt>, <tt>long</tt>, and <tt>double</tt>.  The index
+ * <p> Corresponding methods are defined for the types {@code char,
+ * short, int, long}, and {@code double}.  The index
  * parameters of the absolute <i>get</i> and <i>put</i> methods are in terms of
  * bytes rather than of the type being read or written.
  *
- * <a name="views"></a>
+ * <a id="views"></a>
  *
  * <p> For access to homogeneous binary data, that is, sequences of values of
  * the same type, this class defines methods that can create <i>views</i> of a
@@ -167,8 +168,7 @@ package java.nio;
  * #asFloatBuffer() asFloatBuffer} method, for example, creates an instance of
  * the {@link FloatBuffer} class that is backed by the byte buffer upon which
  * the method is invoked.  Corresponding view-creation methods are defined for
- * the types <tt>char</tt>, <tt>short</tt>, <tt>int</tt>, <tt>long</tt>, and
- * <tt>double</tt>.
+ * the types {@code char, short, int, long}, and {@code double}.
  *
  * <p> View buffers have three important advantages over the families of
  * type-specific <i>get</i> and <i>put</i> methods described above:
@@ -270,7 +270,7 @@ public abstract class ByteBuffer
     //
     final byte[] hb;                  // Non-null only for heap buffers
     final int offset;
-    boolean isReadOnly;                 // Valid only for heap buffers
+    boolean isReadOnly;
 
     // Creates a new buffer with the given mark, position, limit, capacity,
     // backing array, and array offset
@@ -289,14 +289,20 @@ public abstract class ByteBuffer
         this(mark, pos, lim, cap, null, 0);
     }
 
+    @Override
+    Object base() {
+        return hb;
+    }
+
 
 
     /**
      * Allocates a new direct byte buffer.
      *
      * <p> The new buffer's position will be zero, its limit will be its
-     * capacity, its mark will be undefined, and each of its elements will be
-     * initialized to zero.  Whether or not it has a
+     * capacity, its mark will be undefined, each of its elements will be
+     * initialized to zero, and its byte order will be
+     * {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.  Whether or not it has a
      * {@link #hasArray backing array} is unspecified.
      *
      * @param  capacity
@@ -305,7 +311,7 @@ public abstract class ByteBuffer
      * @return  The new byte buffer
      *
      * @throws  IllegalArgumentException
-     *          If the <tt>capacity</tt> is a negative integer
+     *          If the {@code capacity} is a negative integer
      */
     public static ByteBuffer allocateDirect(int capacity) {
         return new DirectByteBuffer(capacity);
@@ -317,9 +323,16 @@ public abstract class ByteBuffer
      * Allocates a new byte buffer.
      *
      * <p> The new buffer's position will be zero, its limit will be its
-     * capacity, its mark will be undefined, and each of its elements will be
-     * initialized to zero.  It will have a {@link #array backing array},
-     * and its {@link #arrayOffset array offset} will be zero.
+     * capacity, its mark will be undefined, each of its elements will be
+     * initialized to zero, and its byte order will be
+
+     * {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+
+
+
+
+     * It will have a {@link #array backing array}, and its
+     * {@link #arrayOffset array offset} will be zero.
      *
      * @param  capacity
      *         The new buffer's capacity, in bytes
@@ -327,11 +340,11 @@ public abstract class ByteBuffer
      * @return  The new byte buffer
      *
      * @throws  IllegalArgumentException
-     *          If the <tt>capacity</tt> is a negative integer
+     *          If the {@code capacity} is a negative integer
      */
     public static ByteBuffer allocate(int capacity) {
         if (capacity < 0)
-            throw new IllegalArgumentException();
+            throw createCapacityException(capacity);
         return new HeapByteBuffer(capacity, capacity);
     }
 
@@ -341,9 +354,16 @@ public abstract class ByteBuffer
      * <p> The new buffer will be backed by the given byte array;
      * that is, modifications to the buffer will cause the array to be modified
      * and vice versa.  The new buffer's capacity will be
-     * <tt>array.length</tt>, its position will be <tt>offset</tt>, its limit
-     * will be <tt>offset + length</tt>, and its mark will be undefined.  Its
-     * {@link #array backing array} will be the given array, and
+     * {@code array.length}, its position will be {@code offset}, its limit
+     * will be {@code offset + length}, its mark will be undefined, and its
+     * byte order will be
+
+     * {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+
+
+
+
+     * Its {@link #array backing array} will be the given array, and
      * its {@link #arrayOffset array offset} will be zero.  </p>
      *
      * @param  array
@@ -351,19 +371,19 @@ public abstract class ByteBuffer
      *
      * @param  offset
      *         The offset of the subarray to be used; must be non-negative and
-     *         no larger than <tt>array.length</tt>.  The new buffer's position
+     *         no larger than {@code array.length}.  The new buffer's position
      *         will be set to this value.
      *
      * @param  length
      *         The length of the subarray to be used;
      *         must be non-negative and no larger than
-     *         <tt>array.length - offset</tt>.
-     *         The new buffer's limit will be set to <tt>offset + length</tt>.
+     *         {@code array.length - offset}.
+     *         The new buffer's limit will be set to {@code offset + length}.
      *
      * @return  The new byte buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If the preconditions on the <tt>offset</tt> and <tt>length</tt>
+     *          If the preconditions on the {@code offset} and {@code length}
      *          parameters do not hold
      */
     public static ByteBuffer wrap(byte[] array,
@@ -382,10 +402,16 @@ public abstract class ByteBuffer
      * <p> The new buffer will be backed by the given byte array;
      * that is, modifications to the buffer will cause the array to be modified
      * and vice versa.  The new buffer's capacity and limit will be
-     * <tt>array.length</tt>, its position will be zero, and its mark will be
-     * undefined.  Its {@link #array backing array} will be the
-     * given array, and its {@link #arrayOffset array offset>} will
-     * be zero.  </p>
+     * {@code array.length}, its position will be zero, its mark will be
+     * undefined, and its byte order will be
+
+     * {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+
+
+
+
+     * Its {@link #array backing array} will be the given array, and its
+     * {@link #arrayOffset array offset} will be zero.  </p>
      *
      * @param  array
      *         The array that will back this buffer
@@ -395,6 +421,14 @@ public abstract class ByteBuffer
     public static ByteBuffer wrap(byte[] array) {
         return wrap(array, 0, array.length);
     }
+
+
+
+
+
+
+
+
 
 
 
@@ -499,13 +533,23 @@ public abstract class ByteBuffer
      * values will be independent.
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
-     * will be the number of bytes remaining in this buffer, and its mark
-     * will be undefined.  The new buffer will be direct if, and only if, this
-     * buffer is direct, and it will be read-only if, and only if, this buffer
-     * is read-only.  </p>
+     * will be the number of bytes remaining in this buffer, its mark will be
+     * undefined, and its byte order will be
+
+     * {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+
+
+
+     * The new buffer will be direct if, and only if, this buffer is direct, and
+     * it will be read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  The new byte buffer
+
+     *
+     * @see #alignedSlice(int)
+
      */
+    @Override
     public abstract ByteBuffer slice();
 
     /**
@@ -516,13 +560,19 @@ public abstract class ByteBuffer
      * versa; the two buffers' position, limit, and mark values will be
      * independent.
      *
-     * <p> The new buffer's capacity, limit, position, and mark values will be
-     * identical to those of this buffer.  The new buffer will be direct if,
-     * and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * <p> The new buffer's capacity, limit, position,
+
+     * and mark values will be identical to those of this buffer, and its byte
+     * order will be {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+
+
+
+     * The new buffer will be direct if, and only if, this buffer is direct, and
+     * it will be read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  The new byte buffer
      */
+    @Override
     public abstract ByteBuffer duplicate();
 
     /**
@@ -535,8 +585,13 @@ public abstract class ByteBuffer
      * content to be modified.  The two buffers' position, limit, and mark
      * values will be independent.
      *
-     * <p> The new buffer's capacity, limit, position, and mark values will be
-     * identical to those of this buffer.
+     * <p> The new buffer's capacity, limit, position,
+
+     * and mark values will be identical to those of this buffer, and its byte
+     * order will be {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+
+
+
      *
      * <p> If this buffer is itself read-only then this method behaves in
      * exactly the same way as the {@link #duplicate duplicate} method.  </p>
@@ -588,7 +643,7 @@ public abstract class ByteBuffer
      * @return  The byte at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit
      */
     public abstract byte get(int index);
@@ -621,7 +676,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit
      *
      * @throws  ReadOnlyBufferException
@@ -638,22 +693,22 @@ public abstract class ByteBuffer
      * <p> This method transfers bytes from this buffer into the given
      * destination array.  If there are fewer bytes remaining in the
      * buffer than are required to satisfy the request, that is, if
-     * <tt>length</tt>&nbsp;<tt>&gt;</tt>&nbsp;<tt>remaining()</tt>, then no
+     * {@code length}&nbsp;{@code >}&nbsp;{@code remaining()}, then no
      * bytes are transferred and a {@link BufferUnderflowException} is
      * thrown.
      *
-     * <p> Otherwise, this method copies <tt>length</tt> bytes from this
+     * <p> Otherwise, this method copies {@code length} bytes from this
      * buffer into the given array, starting at the current position of this
      * buffer and at the given offset in the array.  The position of this
-     * buffer is then incremented by <tt>length</tt>.
+     * buffer is then incremented by {@code length}.
      *
      * <p> In other words, an invocation of this method of the form
-     * <tt>src.get(dst,&nbsp;off,&nbsp;len)</tt> has exactly the same effect as
+     * <code>src.get(dst,&nbsp;off,&nbsp;len)</code> has exactly the same effect as
      * the loop
      *
      * <pre>{@code
      *     for (int i = off; i < off + len; i++)
-     *         dst[i] = src.get():
+     *         dst[i] = src.get();
      * }</pre>
      *
      * except that it first checks that there are sufficient bytes in
@@ -665,21 +720,21 @@ public abstract class ByteBuffer
      * @param  offset
      *         The offset within the array of the first byte to be
      *         written; must be non-negative and no larger than
-     *         <tt>dst.length</tt>
+     *         {@code dst.length}
      *
      * @param  length
      *         The maximum number of bytes to be written to the given
      *         array; must be non-negative and no larger than
-     *         <tt>dst.length - offset</tt>
+     *         {@code dst.length - offset}
      *
      * @return  This buffer
      *
      * @throws  BufferUnderflowException
-     *          If there are fewer than <tt>length</tt> bytes
+     *          If there are fewer than {@code length} bytes
      *          remaining in this buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If the preconditions on the <tt>offset</tt> and <tt>length</tt>
+     *          If the preconditions on the {@code offset} and {@code length}
      *          parameters do not hold
      */
     public ByteBuffer get(byte[] dst, int offset, int length) {
@@ -697,7 +752,7 @@ public abstract class ByteBuffer
      *
      * <p> This method transfers bytes from this buffer into the given
      * destination array.  An invocation of this method of the form
-     * <tt>src.get(a)</tt> behaves in exactly the same way as the invocation
+     * {@code src.get(a)} behaves in exactly the same way as the invocation
      *
      * <pre>
      *     src.get(a, 0, a.length) </pre>
@@ -708,7 +763,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  BufferUnderflowException
-     *          If there are fewer than <tt>length</tt> bytes
+     *          If there are fewer than {@code length} bytes
      *          remaining in this buffer
      */
     public ByteBuffer get(byte[] dst) {
@@ -724,17 +779,17 @@ public abstract class ByteBuffer
      * <p> This method transfers the bytes remaining in the given source
      * buffer into this buffer.  If there are more bytes remaining in the
      * source buffer than in this buffer, that is, if
-     * <tt>src.remaining()</tt>&nbsp;<tt>&gt;</tt>&nbsp;<tt>remaining()</tt>,
+     * {@code src.remaining()}&nbsp;{@code >}&nbsp;{@code remaining()},
      * then no bytes are transferred and a {@link
      * BufferOverflowException} is thrown.
      *
      * <p> Otherwise, this method copies
-     * <i>n</i>&nbsp;=&nbsp;<tt>src.remaining()</tt> bytes from the given
+     * <i>n</i>&nbsp;=&nbsp;{@code src.remaining()} bytes from the given
      * buffer into this buffer, starting at each buffer's current position.
      * The positions of both buffers are then incremented by <i>n</i>.
      *
      * <p> In other words, an invocation of this method of the form
-     * <tt>dst.put(src)</tt> has exactly the same effect as the loop
+     * {@code dst.put(src)} has exactly the same effect as the loop
      *
      * <pre>
      *     while (src.hasRemaining())
@@ -761,7 +816,7 @@ public abstract class ByteBuffer
      */
     public ByteBuffer put(ByteBuffer src) {
         if (src == this)
-            throw new IllegalArgumentException();
+            throw createSameBufferException();
         if (isReadOnly())
             throw new ReadOnlyBufferException();
         int n = src.remaining();
@@ -778,17 +833,17 @@ public abstract class ByteBuffer
      * <p> This method transfers bytes into this buffer from the given
      * source array.  If there are more bytes to be copied from the array
      * than remain in this buffer, that is, if
-     * <tt>length</tt>&nbsp;<tt>&gt;</tt>&nbsp;<tt>remaining()</tt>, then no
+     * {@code length}&nbsp;{@code >}&nbsp;{@code remaining()}, then no
      * bytes are transferred and a {@link BufferOverflowException} is
      * thrown.
      *
-     * <p> Otherwise, this method copies <tt>length</tt> bytes from the
+     * <p> Otherwise, this method copies {@code length} bytes from the
      * given array into this buffer, starting at the given offset in the array
      * and at the current position of this buffer.  The position of this buffer
-     * is then incremented by <tt>length</tt>.
+     * is then incremented by {@code length}.
      *
      * <p> In other words, an invocation of this method of the form
-     * <tt>dst.put(src,&nbsp;off,&nbsp;len)</tt> has exactly the same effect as
+     * <code>dst.put(src,&nbsp;off,&nbsp;len)</code> has exactly the same effect as
      * the loop
      *
      * <pre>{@code
@@ -804,12 +859,12 @@ public abstract class ByteBuffer
      *
      * @param  offset
      *         The offset within the array of the first byte to be read;
-     *         must be non-negative and no larger than <tt>array.length</tt>
+     *         must be non-negative and no larger than {@code array.length}
      *
      * @param  length
      *         The number of bytes to be read from the given array;
      *         must be non-negative and no larger than
-     *         <tt>array.length - offset</tt>
+     *         {@code array.length - offset}
      *
      * @return  This buffer
      *
@@ -817,7 +872,7 @@ public abstract class ByteBuffer
      *          If there is insufficient space in this buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If the preconditions on the <tt>offset</tt> and <tt>length</tt>
+     *          If the preconditions on the {@code offset} and {@code length}
      *          parameters do not hold
      *
      * @throws  ReadOnlyBufferException
@@ -838,7 +893,7 @@ public abstract class ByteBuffer
      *
      * <p> This method transfers the entire content of the given source
      * byte array into this buffer.  An invocation of this method of the
-     * form <tt>dst.put(a)</tt> behaves in exactly the same way as the
+     * form {@code dst.put(a)} behaves in exactly the same way as the
      * invocation
      *
      * <pre>
@@ -959,11 +1014,11 @@ public abstract class ByteBuffer
      * Tells whether or not this buffer is backed by an accessible byte
      * array.
      *
-     * <p> If this method returns <tt>true</tt> then the {@link #array() array}
+     * <p> If this method returns {@code true} then the {@link #array() array}
      * and {@link #arrayOffset() arrayOffset} methods may safely be invoked.
      * </p>
      *
-     * @return  <tt>true</tt> if, and only if, this buffer
+     * @return  {@code true} if, and only if, this buffer
      *          is backed by an array and is not read-only
      */
     public final boolean hasArray() {
@@ -1002,7 +1057,7 @@ public abstract class ByteBuffer
      * element of the buffer&nbsp;&nbsp;<i>(optional operation)</i>.
      *
      * <p> If this buffer is backed by an array then buffer position <i>p</i>
-     * corresponds to array index <i>p</i>&nbsp;+&nbsp;<tt>arrayOffset()</tt>.
+     * corresponds to array index <i>p</i>&nbsp;+&nbsp;{@code arrayOffset()}.
      *
      * <p> Invoke the {@link #hasArray hasArray} method before invoking this
      * method in order to ensure that this buffer has an accessible backing
@@ -1025,16 +1080,109 @@ public abstract class ByteBuffer
         return offset;
     }
 
+    // -- Covariant return type overrides
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public
+
+
+
+    ByteBuffer position(int newPosition) {
+        super.position(newPosition);
+        return this;
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public
+
+
+
+    ByteBuffer limit(int newLimit) {
+        super.limit(newLimit);
+        return this;
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public 
+
+
+
+    ByteBuffer mark() {
+        super.mark();
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public 
+
+
+
+    ByteBuffer reset() {
+        super.reset();
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public 
+
+
+
+    ByteBuffer clear() {
+        super.clear();
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public 
+
+
+
+    ByteBuffer flip() {
+        super.flip();
+        return this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public 
+
+
+
+    ByteBuffer rewind() {
+        super.rewind();
+        return this;
+    }
+
     /**
      * Compacts this buffer&nbsp;&nbsp;<i>(optional operation)</i>.
      *
      * <p> The bytes between the buffer's current position and its limit,
      * if any, are copied to the beginning of the buffer.  That is, the
-     * byte at index <i>p</i>&nbsp;=&nbsp;<tt>position()</tt> is copied
+     * byte at index <i>p</i>&nbsp;=&nbsp;{@code position()} is copied
      * to index zero, the byte at index <i>p</i>&nbsp;+&nbsp;1 is copied
      * to index one, and so forth until the byte at index
-     * <tt>limit()</tt>&nbsp;-&nbsp;1 is copied to index
-     * <i>n</i>&nbsp;=&nbsp;<tt>limit()</tt>&nbsp;-&nbsp;<tt>1</tt>&nbsp;-&nbsp;<i>p</i>.
+     * {@code limit()}&nbsp;-&nbsp;1 is copied to index
+     * <i>n</i>&nbsp;=&nbsp;{@code limit()}&nbsp;-&nbsp;{@code 1}&nbsp;-&nbsp;<i>p</i>.
      * The buffer's position is then set to <i>n+1</i> and its limit is set to
      * its capacity.  The mark, if defined, is discarded.
      *
@@ -1047,7 +1195,7 @@ public abstract class ByteBuffer
      *
      * <p> Invoke this method after writing data from a buffer in case the
      * write was incomplete.  The following loop, for example, copies bytes
-     * from one channel to another via the buffer <tt>buf</tt>:
+     * from one channel to another via the buffer {@code buf}:
      *
      * <blockquote><pre>{@code
      *   buf.clear();          // Prepare buffer for use
@@ -1070,7 +1218,7 @@ public abstract class ByteBuffer
     /**
      * Tells whether or not this byte buffer is direct.
      *
-     * @return  <tt>true</tt> if, and only if, this buffer is direct
+     * @return  {@code true} if, and only if, this buffer is direct
      */
     public abstract boolean isDirect();
 
@@ -1103,8 +1251,8 @@ public abstract class ByteBuffer
      * Returns the current hash code of this buffer.
      *
      * <p> The hash code of a byte buffer depends only upon its remaining
-     * elements; that is, upon the elements from <tt>position()</tt> up to, and
-     * including, the element at <tt>limit()</tt>&nbsp;-&nbsp;<tt>1</tt>.
+     * elements; that is, upon the elements from {@code position()} up to, and
+     * including, the element at {@code limit()}&nbsp;-&nbsp;{@code 1}.
      *
      * <p> Because buffer hash codes are content-dependent, it is inadvisable
      * to use buffers as keys in hash maps or similar data structures unless it
@@ -1153,7 +1301,7 @@ public abstract class ByteBuffer
      *
      * @param  ob  The object to which this buffer is to be compared
      *
-     * @return  <tt>true</tt> if, and only if, this buffer is equal to the
+     * @return  {@code true} if, and only if, this buffer is equal to the
      *           given object
      */
     public boolean equals(Object ob) {
@@ -1162,21 +1310,15 @@ public abstract class ByteBuffer
         if (!(ob instanceof ByteBuffer))
             return false;
         ByteBuffer that = (ByteBuffer)ob;
-        if (this.remaining() != that.remaining())
+        int thisPos = this.position();
+        int thisRem = this.limit() - thisPos;
+        int thatPos = that.position();
+        int thatRem = that.limit() - thatPos;
+        if (thisRem < 0 || thisRem != thatRem)
             return false;
-        int p = this.position();
-        for (int i = this.limit() - 1, j = that.limit() - 1; i >= p; i--, j--)
-            if (!equals(this.get(i), that.get(j)))
-                return false;
-        return true;
-    }
-
-    private static boolean equals(byte x, byte y) {
-
-
-
-        return x == y;
-
+        return BufferMismatch.mismatch(this, thisPos,
+                                       that, thatPos,
+                                       thisRem) < 0;
     }
 
     /**
@@ -1203,13 +1345,20 @@ public abstract class ByteBuffer
      *          is less than, equal to, or greater than the given buffer
      */
     public int compareTo(ByteBuffer that) {
-        int n = this.position() + Math.min(this.remaining(), that.remaining());
-        for (int i = this.position(), j = that.position(); i < n; i++, j++) {
-            int cmp = compare(this.get(i), that.get(j));
-            if (cmp != 0)
-                return cmp;
+        int thisPos = this.position();
+        int thisRem = this.limit() - thisPos;
+        int thatPos = that.position();
+        int thatRem = that.limit() - thatPos;
+        int length = Math.min(thisRem, thatRem);
+        if (length < 0)
+            return -1;
+        int i = BufferMismatch.mismatch(this, thisPos,
+                                        that, thatPos,
+                                        length);
+        if (i >= 0) {
+            return compare(this.get(thisPos + i), that.get(thatPos + i));
         }
-        return this.remaining() - that.remaining();
+        return thisRem - thatRem;
     }
 
     private static int compare(byte x, byte y) {
@@ -1221,6 +1370,44 @@ public abstract class ByteBuffer
 
         return Byte.compare(x, y);
 
+    }
+
+    /**
+     * Finds and returns the relative index of the first mismatch between this
+     * buffer and a given buffer.  The index is relative to the
+     * {@link #position() position} of each buffer and will be in the range of
+     * 0 (inclusive) up to the smaller of the {@link #remaining() remaining}
+     * elements in each buffer (exclusive).
+     *
+     * <p> If the two buffers share a common prefix then the returned index is
+     * the length of the common prefix and it follows that there is a mismatch
+     * between the two buffers at that index within the respective buffers.
+     * If one buffer is a proper prefix of the other then the returned index is
+     * the smaller of the remaining elements in each buffer, and it follows that
+     * the index is only valid for the buffer with the larger number of
+     * remaining elements.
+     * Otherwise, there is no mismatch.
+     *
+     * @param  that
+     *         The byte buffer to be tested for a mismatch with this buffer
+     *
+     * @return  The relative index of the first mismatch between this and the
+     *          given buffer, otherwise -1 if no mismatch.
+     *
+     * @since 11
+     */
+    public int mismatch(ByteBuffer that) {
+        int thisPos = this.position();
+        int thisRem = this.limit() - thisPos;
+        int thatPos = that.position();
+        int thatRem = that.limit() - thatPos;
+        int length = Math.min(thisRem, thatRem);
+        if (length < 0)
+            return -1;
+        int r = BufferMismatch.mismatch(this, thisPos,
+                                        that, thatPos,
+                                        length);
+        return (r == -1 && thisRem != thatRem) ? length : r;
     }
 
     // -- Other char stuff --
@@ -1440,10 +1627,16 @@ public abstract class ByteBuffer
 
 
 
+
+
+
+
+
+
     boolean bigEndian                                   // package-private
         = true;
     boolean nativeByteOrder                             // package-private
-        = (Bits.byteOrder() == ByteOrder.BIG_ENDIAN);
+        = (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN);
 
     /**
      * Retrieves this buffer's byte order.
@@ -1472,14 +1665,146 @@ public abstract class ByteBuffer
     public final ByteBuffer order(ByteOrder bo) {
         bigEndian = (bo == ByteOrder.BIG_ENDIAN);
         nativeByteOrder =
-            (bigEndian == (Bits.byteOrder() == ByteOrder.BIG_ENDIAN));
+            (bigEndian == (ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN));
         return this;
     }
 
-    // Unchecked accessors, for use by ByteBufferAs-X-Buffer classes
-    //
-    abstract byte _get(int i);                          // package-private
-    abstract void _put(int i, byte b);                  // package-private
+    /**
+     * Returns the memory address, pointing to the byte at the given index,
+     * modulus the given unit size.
+     *
+     * <p> A return value greater than zero indicates the address of the byte at
+     * the index is misaligned for the unit size, and the value's quantity
+     * indicates how much the index should be rounded up or down to locate a
+     * byte at an aligned address.  Otherwise, a value of {@code 0} indicates
+     * that the address of the byte at the index is aligned for the unit size.
+     *
+     * @apiNote
+     * This method may be utilized to determine if unit size bytes from an
+     * index can be accessed atomically, if supported by the native platform.
+     *
+     * @implNote
+     * This implementation throws {@code UnsupportedOperationException} for
+     * non-direct buffers when the given unit size is greater then {@code 8}.
+     *
+     * @param  index
+     *         The index to query for alignment offset, must be non-negative, no
+     *         upper bounds check is performed
+     *
+     * @param  unitSize
+     *         The unit size in bytes, must be a power of {@code 2}
+     *
+     * @return  The indexed byte's memory address modulus the unit size
+     *
+     * @throws IllegalArgumentException
+     *         If the index is negative or the unit size is not a power of
+     *         {@code 2}
+     *
+     * @throws UnsupportedOperationException
+     *         If the native platform does not guarantee stable alignment offset
+     *         values for the given unit size when managing the memory regions
+     *         of buffers of the same kind as this buffer (direct or
+     *         non-direct).  For example, if garbage collection would result
+     *         in the moving of a memory region covered by a non-direct buffer
+     *         from one location to another and both locations have different
+     *         alignment characteristics.
+     *
+     * @see #alignedSlice(int)
+     * @since 9
+     */
+    public final int alignmentOffset(int index, int unitSize) {
+        if (index < 0)
+            throw new IllegalArgumentException("Index less than zero: " + index);
+        if (unitSize < 1 || (unitSize & (unitSize - 1)) != 0)
+            throw new IllegalArgumentException("Unit size not a power of two: " + unitSize);
+        if (unitSize > 8 && !isDirect())
+            throw new UnsupportedOperationException("Unit size unsupported for non-direct buffers: " + unitSize);
+
+        return (int) ((address + index) % unitSize);
+    }
+
+    /**
+     * Creates a new byte buffer whose content is a shared and aligned
+     * subsequence of this buffer's content.
+     *
+     * <p> The content of the new buffer will start at this buffer's current
+     * position rounded up to the index of the nearest aligned byte for the
+     * given unit size, and end at this buffer's limit rounded down to the index
+     * of the nearest aligned byte for the given unit size.
+     * If rounding results in out-of-bound values then the new buffer's capacity
+     * and limit will be zero.  If rounding is within bounds the following
+     * expressions will be true for a new buffer {@code nb} and unit size
+     * {@code unitSize}:
+     * <pre>{@code
+     * nb.alignmentOffset(0, unitSize) == 0
+     * nb.alignmentOffset(nb.limit(), unitSize) == 0
+     * }</pre>
+     *
+     * <p> Changes to this buffer's content will be visible in the new
+     * buffer, and vice versa; the two buffers' position, limit, and mark
+     * values will be independent.
+     *
+     * <p> The new buffer's position will be zero, its capacity and its limit
+     * will be the number of bytes remaining in this buffer or fewer subject to
+     * alignment, its mark will be undefined, and its byte order will be
+     * {@link ByteOrder#BIG_ENDIAN BIG_ENDIAN}.
+     *
+     * The new buffer will be direct if, and only if, this buffer is direct, and
+     * it will be read-only if, and only if, this buffer is read-only.  </p>
+     *
+     * @apiNote
+     * This method may be utilized to create a new buffer where unit size bytes
+     * from index, that is a multiple of the unit size, may be accessed
+     * atomically, if supported by the native platform.
+     *
+     * @implNote
+     * This implementation throws {@code UnsupportedOperationException} for
+     * non-direct buffers when the given unit size is greater then {@code 8}.
+     *
+     * @param  unitSize
+     *         The unit size in bytes, must be a power of {@code 2}
+     *
+     * @return  The new byte buffer
+     *
+     * @throws IllegalArgumentException
+     *         If the unit size not a power of {@code 2}
+     *
+     * @throws UnsupportedOperationException
+     *         If the native platform does not guarantee stable aligned slices
+     *         for the given unit size when managing the memory regions
+     *         of buffers of the same kind as this buffer (direct or
+     *         non-direct).  For example, if garbage collection would result
+     *         in the moving of a memory region covered by a non-direct buffer
+     *         from one location to another and both locations have different
+     *         alignment characteristics.
+     *
+     * @see #alignmentOffset(int, int)
+     * @see #slice()
+     * @since 9
+     */
+    public final ByteBuffer alignedSlice(int unitSize) {
+        int pos = position();
+        int lim = limit();
+
+        int pos_mod = alignmentOffset(pos, unitSize);
+        int lim_mod = alignmentOffset(lim, unitSize);
+
+        // Round up the position to align with unit size
+        int aligned_pos = (pos_mod > 0)
+            ? pos + (unitSize - pos_mod)
+            : pos;
+
+        // Round down the limit to align with unit size
+        int aligned_lim = lim - lim_mod;
+
+        if (aligned_pos > lim || aligned_lim < pos) {
+            aligned_pos = aligned_lim = pos;
+        }
+
+        return slice(aligned_pos, aligned_lim);
+    }
+
+    abstract ByteBuffer slice(int pos, int lim);
 
 
     /**
@@ -1531,7 +1856,7 @@ public abstract class ByteBuffer
      * @return  The char value at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus one
      */
@@ -1553,7 +1878,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus one
      *
@@ -1572,9 +1897,10 @@ public abstract class ByteBuffer
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
      * will be the number of bytes remaining in this buffer divided by
-     * two, and its mark will be undefined.  The new buffer will be direct
-     * if, and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * two, its mark will be undefined, and its byte order will be that
+     * of the byte buffer at the moment the view is created.  The new buffer
+     * will be direct if, and only if, this buffer is direct, and it will be
+     * read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  A new char buffer
      */
@@ -1630,7 +1956,7 @@ public abstract class ByteBuffer
      * @return  The short value at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus one
      */
@@ -1652,7 +1978,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus one
      *
@@ -1671,9 +1997,10 @@ public abstract class ByteBuffer
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
      * will be the number of bytes remaining in this buffer divided by
-     * two, and its mark will be undefined.  The new buffer will be direct
-     * if, and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * two, its mark will be undefined, and its byte order will be that
+     * of the byte buffer at the moment the view is created.  The new buffer
+     * will be direct if, and only if, this buffer is direct, and it will be
+     * read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  A new short buffer
      */
@@ -1729,7 +2056,7 @@ public abstract class ByteBuffer
      * @return  The int value at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus three
      */
@@ -1751,7 +2078,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus three
      *
@@ -1770,9 +2097,10 @@ public abstract class ByteBuffer
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
      * will be the number of bytes remaining in this buffer divided by
-     * four, and its mark will be undefined.  The new buffer will be direct
-     * if, and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * four, its mark will be undefined, and its byte order will be that
+     * of the byte buffer at the moment the view is created.  The new buffer
+     * will be direct if, and only if, this buffer is direct, and it will be
+     * read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  A new int buffer
      */
@@ -1828,7 +2156,7 @@ public abstract class ByteBuffer
      * @return  The long value at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus seven
      */
@@ -1850,7 +2178,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus seven
      *
@@ -1869,9 +2197,10 @@ public abstract class ByteBuffer
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
      * will be the number of bytes remaining in this buffer divided by
-     * eight, and its mark will be undefined.  The new buffer will be direct
-     * if, and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * eight, its mark will be undefined, and its byte order will be that
+     * of the byte buffer at the moment the view is created.  The new buffer
+     * will be direct if, and only if, this buffer is direct, and it will be
+     * read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  A new long buffer
      */
@@ -1927,7 +2256,7 @@ public abstract class ByteBuffer
      * @return  The float value at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus three
      */
@@ -1949,7 +2278,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus three
      *
@@ -1968,9 +2297,10 @@ public abstract class ByteBuffer
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
      * will be the number of bytes remaining in this buffer divided by
-     * four, and its mark will be undefined.  The new buffer will be direct
-     * if, and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * four, its mark will be undefined, and its byte order will be that
+     * of the byte buffer at the moment the view is created.  The new buffer
+     * will be direct if, and only if, this buffer is direct, and it will be
+     * read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  A new float buffer
      */
@@ -2026,7 +2356,7 @@ public abstract class ByteBuffer
      * @return  The double value at the given index
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus seven
      */
@@ -2048,7 +2378,7 @@ public abstract class ByteBuffer
      * @return  This buffer
      *
      * @throws  IndexOutOfBoundsException
-     *          If <tt>index</tt> is negative
+     *          If {@code index} is negative
      *          or not smaller than the buffer's limit,
      *          minus seven
      *
@@ -2067,9 +2397,10 @@ public abstract class ByteBuffer
      *
      * <p> The new buffer's position will be zero, its capacity and its limit
      * will be the number of bytes remaining in this buffer divided by
-     * eight, and its mark will be undefined.  The new buffer will be direct
-     * if, and only if, this buffer is direct, and it will be read-only if, and
-     * only if, this buffer is read-only.  </p>
+     * eight, its mark will be undefined, and its byte order will be that
+     * of the byte buffer at the moment the view is created.  The new buffer
+     * will be direct if, and only if, this buffer is direct, and it will be
+     * read-only if, and only if, this buffer is read-only.  </p>
      *
      * @return  A new double buffer
      */

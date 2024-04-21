@@ -1,31 +1,32 @@
 /*
- * Copyright (c) 2005, 2011, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2005, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.util.spi;
 
 import java.util.Locale;
+import java.util.Objects;
 
 /**
  * An abstract class for service providers that
@@ -141,4 +142,54 @@ public abstract class LocaleNameProvider extends LocaleServiceProvider {
      * @see java.util.Locale#getDisplayVariant(java.util.Locale)
      */
     public abstract String getDisplayVariant(String variant, Locale locale);
+
+    /**
+     * Returns a localized name for the given
+     * <a href="../Locale.html#def_locale_extension">Unicode extension</a> key,
+     * and the given locale that is appropriate for display to the user.
+     * If the name returned cannot be localized according to {@code locale},
+     * this method returns null.
+     * @implSpec the default implementation returns {@code null}.
+     * @param key the Unicode Extension key, not null.
+     * @param locale the desired locale, not null.
+     * @return the name of the given key string for the specified locale,
+     *  or null if it's not available.
+     * @exception NullPointerException if {@code key} or {@code locale} is null
+     * @exception IllegalArgumentException if {@code locale} isn't
+     *     one of the locales returned from
+     *     {@link java.util.spi.LocaleServiceProvider#getAvailableLocales()
+     *     getAvailableLocales()}.
+     * @since 10
+     */
+    public String getDisplayUnicodeExtensionKey(String key, Locale locale) {
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(locale);
+        return null;
+    }
+
+    /**
+     * Returns a localized name for the given
+     * <a href="../Locale.html#def_locale_extension">Unicode extension</a> type,
+     * and the given locale that is appropriate for display to the user.
+     * If the name returned cannot be localized according to {@code locale},
+     * this method returns null.
+     * @implSpec the default implementation returns {@code null}.
+     * @param type the Unicode Extension type, not null.
+     * @param key the Unicode Extension key for this {@code type}, not null.
+     * @param locale the desired locale, not null.
+     * @return the name of the given type string for the specified locale,
+     *  or null if it's not available.
+     * @exception NullPointerException if {@code key}, {@code type} or {@code locale} is null
+     * @exception IllegalArgumentException if {@code locale} isn't
+     *     one of the locales returned from
+     *     {@link java.util.spi.LocaleServiceProvider#getAvailableLocales()
+     *     getAvailableLocales()}.
+     * @since 10
+     */
+    public String getDisplayUnicodeExtensionType(String type, String key, Locale locale) {
+        Objects.requireNonNull(type);
+        Objects.requireNonNull(key);
+        Objects.requireNonNull(locale);
+        return null;
+    }
 }

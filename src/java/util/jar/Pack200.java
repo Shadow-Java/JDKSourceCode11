@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2003, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * Copyright (c) 2003, 2017, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 package java.util.jar;
 
@@ -29,15 +29,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.beans.PropertyChangeListener;
-
-
+import sun.security.action.GetPropertyAction;
 
 
 /**
  * Transforms a JAR file to or from a packed stream in Pack200 format.
- * Please refer to Network Transfer Format JSR 200 Specification at
- * <a href=http://jcp.org/aboutJava/communityprocess/review/jsr200/index.html>http://jcp.org/aboutJava/communityprocess/review/jsr200/index.html</a>
+ * Please refer to <a href="{@docRoot}/../specs/pack-spec.html">Network Transfer Format JSR 200 Specification</a>
  * <p>
  * Typically the packer engine is used by application developers
  * to deploy or host JAR files on a website.
@@ -96,16 +93,18 @@ import java.beans.PropertyChangeListener;
  * The deployment applications can use "Accept-Encoding=pack200-gzip". This
  * indicates to the server that the client application desires a version of
  * the file encoded with Pack200 and further compressed with gzip. Please
- * refer to  <a href="{@docRoot}/../technotes/guides/deployment/deployment-guide/pack200.html">Java Deployment Guide</a> for more details and
- * techniques.
+ * refer to the Java Deployment Guide for techniques and details.
  * <p>
- * Unless otherwise noted, passing a <tt>null</tt> argument to a constructor or
+ * Unless otherwise noted, passing a {@code null} argument to a constructor or
  * method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @author John Rose
  * @author Kumar Srinivasan
  * @since 1.5
+ * @deprecated This class is deprecated, and is planned for removal in a future
+ *             release.
  */
+@Deprecated(since="11", forRemoval=true)
 public abstract class Pack200 {
     private Pack200() {} //prevent instantiation
 
@@ -113,7 +112,7 @@ public abstract class Pack200 {
     /**
      * Obtain new instance of a class that implements Packer.
      * <ul>
-     * <li><p>If the system property <tt>java.util.jar.Pack200.Packer</tt>
+     * <li><p>If the system property {@code java.util.jar.Pack200.Packer}
      * is defined, then the value is taken to be the fully-qualified name
      * of a concrete implementation class, which must implement Packer.
      * This class is loaded and instantiated.  If this process fails
@@ -131,7 +130,7 @@ public abstract class Pack200 {
      *
      * @return  A newly allocated Packer engine.
      */
-    public synchronized static Packer newPacker() {
+    public static synchronized Packer newPacker() {
         return (Packer) newInstance(PACK_PROVIDER);
     }
 
@@ -139,7 +138,7 @@ public abstract class Pack200 {
     /**
      * Obtain new instance of a class that implements Unpacker.
      * <ul>
-     * <li><p>If the system property <tt>java.util.jar.Pack200.Unpacker</tt>
+     * <li><p>If the system property {@code java.util.jar.Pack200.Unpacker}
      * is defined, then the value is taken to be the fully-qualified
      * name of a concrete implementation class, which must implement Unpacker.
      * The class is loaded and instantiated.  If this process fails
@@ -224,12 +223,15 @@ public abstract class Pack200 {
      *    If the input JAR-files contains a 1.6 class file, then the pack file
      * version will be set to 1.6.
      * <p>
-     * Note: Unless otherwise noted, passing a <tt>null</tt> argument to a
+     * Note: Unless otherwise noted, passing a {@code null} argument to a
      * constructor or method in this class will cause a {@link NullPointerException}
      * to be thrown.
-     * <p>
+     *
      * @since 1.5
+     * @deprecated This interface is deprecated, and is planned for removal in a
+     *             future release.
      */
+    @Deprecated(since="11", forRemoval=true)
     public interface Packer {
         /**
          * This property is a numeral giving the estimated target size N
@@ -371,7 +373,7 @@ public abstract class Pack200 {
          * {@link #STRIP}, and {@link #PASS}.
          * <p>
          * The string {@link #ERROR} means that the pack operation
-         * as a whole will fail, with an exception of type <code>IOException</code>.
+         * as a whole will fail, with an exception of type {@code IOException}.
          * The string
          * {@link #STRIP} means that the attribute will be dropped.
          * The string
@@ -395,7 +397,7 @@ public abstract class Pack200 {
          * using the layout language specified in the JSR 200 specification.
          * <p>
          * For example, the effect of this option is built in:
-         * <code>pack.class.attribute.SourceFile=RUH</code>.
+         * {@code pack.class.attribute.SourceFile=RUH}.
          * <p>
          * The special strings {@link #ERROR}, {@link #STRIP}, and {@link #PASS} are
          * also allowed, with the same meaning as {@link #UNKNOWN_ATTRIBUTE}.
@@ -403,21 +405,21 @@ public abstract class Pack200 {
          * refused, stripped, or passed bitwise (with no class compression).
          * <p>
          * Code like this might be used to support attributes for JCOV:
-         * <pre><code>
+         * <pre>{@code
          *     Map p = packer.properties();
          *     p.put(CODE_ATTRIBUTE_PFX+"CoverageTable",       "NH[PHHII]");
          *     p.put(CODE_ATTRIBUTE_PFX+"CharacterRangeTable", "NH[PHPOHIIH]");
          *     p.put(CLASS_ATTRIBUTE_PFX+"SourceID",           "RUH");
          *     p.put(CLASS_ATTRIBUTE_PFX+"CompilationID",      "RUH");
-         * </code></pre>
+         * }</pre>
          * <p>
          * Code like this might be used to strip debugging attributes:
-         * <pre><code>
+         * <pre>{@code
          *     Map p = packer.properties();
          *     p.put(CODE_ATTRIBUTE_PFX+"LineNumberTable",    STRIP);
          *     p.put(CODE_ATTRIBUTE_PFX+"LocalVariableTable", STRIP);
          *     p.put(CLASS_ATTRIBUTE_PFX+"SourceFile",        STRIP);
-         * </code></pre>
+         * }</pre>
          */
         String CLASS_ATTRIBUTE_PFX      = "pack.class.attribute.";
 
@@ -425,7 +427,7 @@ public abstract class Pack200 {
          * When concatenated with a field attribute name,
          * indicates the format of that attribute.
          * For example, the effect of this option is built in:
-         * <code>pack.field.attribute.Deprecated=</code>.
+         * {@code pack.field.attribute.Deprecated=}.
          * The special strings {@link #ERROR}, {@link #STRIP}, and
          * {@link #PASS} are also allowed.
          * @see #CLASS_ATTRIBUTE_PFX
@@ -436,7 +438,7 @@ public abstract class Pack200 {
          * When concatenated with a method attribute name,
          * indicates the format of that attribute.
          * For example, the effect of this option is built in:
-         * <code>pack.method.attribute.Exceptions=NH[RCH]</code>.
+         * {@code pack.method.attribute.Exceptions=NH[RCH]}.
          * The special strings {@link #ERROR}, {@link #STRIP}, and {@link #PASS}
          * are also allowed.
          * @see #CLASS_ATTRIBUTE_PFX
@@ -447,7 +449,7 @@ public abstract class Pack200 {
          * When concatenated with a code attribute name,
          * indicates the format of that attribute.
          * For example, the effect of this option is built in:
-         * <code>pack.code.attribute.LocalVariableTable=NH[PHOHRUHRSHH]</code>.
+         * {@code pack.code.attribute.LocalVariableTable=NH[PHOHRUHRSHH]}.
          * The special strings {@link #ERROR}, {@link #STRIP}, and {@link #PASS}
          * are also allowed.
          * @see #CLASS_ATTRIBUTE_PFX
@@ -455,13 +457,13 @@ public abstract class Pack200 {
         String CODE_ATTRIBUTE_PFX       = "pack.code.attribute.";
 
         /**
-         * The unpacker's progress as a percentage, as periodically
-         * updated by the unpacker.
+         * The packer's progress as a percentage, as periodically
+         * updated by the packer.
          * Values of 0 - 100 are normal, and -1 indicates a stall.
          * Progress can be monitored by polling the value of this
          * property.
          * <p>
-         * At a minimum, the unpacker must set progress to 0
+         * At a minimum, the packer must set progress to 0
          * at the beginning of a packing operation, and to 100
          * at the end.
          */
@@ -531,9 +533,9 @@ public abstract class Pack200 {
          * <p>
          * Implementation specific properties are prefixed with a
          * package name associated with the implementor, beginning
-         * with <tt>com.</tt> or a similar prefix.
-         * All property names beginning with <tt>pack.</tt> and
-         * <tt>unpack.</tt> are reserved for use by this API.
+         * with {@code com.} or a similar prefix.
+         * All property names beginning with {@code pack.} and
+         * {@code unpack.} are reserved for use by this API.
          * <p>
          * Unknown properties may be ignored or rejected with an
          * unspecified error, and invalid entries may cause an
@@ -571,54 +573,6 @@ public abstract class Pack200 {
          * @exception IOException if an error is encountered.
          */
         void pack(JarInputStream in, OutputStream out) throws IOException ;
-
-        /**
-         * Registers a listener for PropertyChange events on the properties map.
-         * This is typically used by applications to update a progress bar.
-         *
-         * <p> The default implementation of this method does nothing and has
-         * no side-effects.</p>
-         *
-         * <p><b>WARNING:</b> This method is omitted from the interface
-         * declaration in all subset Profiles of Java SE that do not include
-         * the {@code java.beans} package. </p>
-
-         * @see #properties
-         * @see #PROGRESS
-         * @param listener  An object to be invoked when a property is changed.
-         * @deprecated The dependency on {@code PropertyChangeListener} creates
-         *             a significant impediment to future modularization of the
-         *             Java platform. This method will be removed in a future
-         *             release.
-         *             Applications that need to monitor progress of the packer
-         *             can poll the value of the {@link #PROGRESS PROGRESS}
-         *             property instead.
-         */
-        @Deprecated
-        default void addPropertyChangeListener(PropertyChangeListener listener) {
-        }
-
-        /**
-         * Remove a listener for PropertyChange events, added by
-         * the {@link #addPropertyChangeListener}.
-         *
-         * <p> The default implementation of this method does nothing and has
-         * no side-effects.</p>
-         *
-         * <p><b>WARNING:</b> This method is omitted from the interface
-         * declaration in all subset Profiles of Java SE that do not include
-         * the {@code java.beans} package. </p>
-         *
-         * @see #addPropertyChangeListener
-         * @param listener  The PropertyChange listener to be removed.
-         * @deprecated The dependency on {@code PropertyChangeListener} creates
-         *             a significant impediment to future modularization of the
-         *             Java platform. This method will be removed in a future
-         *             release.
-         */
-        @Deprecated
-        default void removePropertyChangeListener(PropertyChangeListener listener) {
-        }
     }
 
     /**
@@ -627,16 +581,19 @@ public abstract class Pack200 {
      * using {@link #newUnpacker}.
      * <p>
      * Every JAR file produced by this engine will include the string
-     * "<tt>PACK200</tt>" as a zip file comment.
+     * "{@code PACK200}" as a zip file comment.
      * This allows a deployer to detect if a JAR archive was packed and unpacked.
      * <p>
-     * Note: Unless otherwise noted, passing a <tt>null</tt> argument to a
+     * Note: Unless otherwise noted, passing a {@code null} argument to a
      * constructor or method in this class will cause a {@link NullPointerException}
      * to be thrown.
      * <p>
      * This version of the unpacker is compatible with all previous versions.
      * @since 1.5
+     * @deprecated This interface is deprecated, and is planned for removal in a
+     *             future release.
      */
+    @Deprecated(since="11", forRemoval=true)
     public interface Unpacker {
 
         /** The string "keep", a possible value for certain properties.
@@ -674,7 +631,7 @@ public abstract class Pack200 {
          * property.
          * <p>
          * At a minimum, the unpacker must set progress to 0
-         * at the beginning of a packing operation, and to 100
+         * at the beginning of an unpacking operation, and to 100
          * at the end.
          */
         String PROGRESS         = "unpack.progress";
@@ -682,7 +639,7 @@ public abstract class Pack200 {
         /**
          * Get the set of this engine's properties. This set is
          * a "live view", so that changing its
-         * contents immediately affects the Packer engine, and
+         * contents immediately affects the Unpacker engine, and
          * changes from the engine (such as progress indications)
          * are immediately visible in the map.
          *
@@ -693,9 +650,9 @@ public abstract class Pack200 {
          * <p>
          * Implementation specific properties are prefixed with a
          * package name associated with the implementor, beginning
-         * with <tt>com.</tt> or a similar prefix.
-         * All property names beginning with <tt>pack.</tt> and
-         * <tt>unpack.</tt> are reserved for use by this API.
+         * with {@code com.} or a similar prefix.
+         * All property names beginning with {@code pack.} and
+         * {@code unpack.} are reserved for use by this API.
          * <p>
          * Unknown properties may be ignored or rejected with an
          * unspecified error, and invalid entries may cause an
@@ -730,54 +687,6 @@ public abstract class Pack200 {
          * @exception IOException if an error is encountered.
          */
         void unpack(File in, JarOutputStream out) throws IOException;
-
-        /**
-         * Registers a listener for PropertyChange events on the properties map.
-         * This is typically used by applications to update a progress bar.
-         *
-         * <p> The default implementation of this method does nothing and has
-         * no side-effects.</p>
-         *
-         * <p><b>WARNING:</b> This method is omitted from the interface
-         * declaration in all subset Profiles of Java SE that do not include
-         * the {@code java.beans} package. </p>
-         *
-         * @see #properties
-         * @see #PROGRESS
-         * @param listener  An object to be invoked when a property is changed.
-         * @deprecated The dependency on {@code PropertyChangeListener} creates
-         *             a significant impediment to future modularization of the
-         *             Java platform. This method will be removed in a future
-         *             release.
-         *             Applications that need to monitor progress of the
-         *             unpacker can poll the value of the {@link #PROGRESS
-         *             PROGRESS} property instead.
-         */
-        @Deprecated
-        default void addPropertyChangeListener(PropertyChangeListener listener) {
-        }
-
-        /**
-         * Remove a listener for PropertyChange events, added by
-         * the {@link #addPropertyChangeListener}.
-         *
-         * <p> The default implementation of this method does nothing and has
-         * no side-effects.</p>
-         *
-         * <p><b>WARNING:</b> This method is omitted from the interface
-         * declaration in all subset Profiles of Java SE that do not include
-         * the {@code java.beans} package. </p>
-         *
-         * @see #addPropertyChangeListener
-         * @param listener  The PropertyChange listener to be removed.
-         * @deprecated The dependency on {@code PropertyChangeListener} creates
-         *             a significant impediment to future modularization of the
-         *             Java platform. This method will be removed in a future
-         *             release.
-         */
-        @Deprecated
-        default void removePropertyChangeListener(PropertyChangeListener listener) {
-        }
     }
 
     // Private stuff....
@@ -788,14 +697,13 @@ public abstract class Pack200 {
     private static Class<?> packerImpl;
     private static Class<?> unpackerImpl;
 
-    private synchronized static Object newInstance(String prop) {
+    private static synchronized Object newInstance(String prop) {
         String implName = "(unknown)";
         try {
             Class<?> impl = (PACK_PROVIDER.equals(prop))? packerImpl: unpackerImpl;
             if (impl == null) {
                 // The first time, we must decide which class to use.
-                implName = java.security.AccessController.doPrivileged(
-                    new sun.security.action.GetPropertyAction(prop,""));
+                implName = GetPropertyAction.privilegedGetProperty(prop,"");
                 if (implName != null && !implName.equals(""))
                     impl = Class.forName(implName);
                 else if (PACK_PROVIDER.equals(prop))
@@ -804,7 +712,9 @@ public abstract class Pack200 {
                     impl = com.sun.java.util.jar.pack.UnpackerImpl.class;
             }
             // We have a class.  Now instantiate it.
-            return impl.newInstance();
+            @SuppressWarnings("deprecation")
+            Object result = impl.newInstance();
+            return result;
         } catch (ClassNotFoundException e) {
             throw new Error("Class not found: " + implName +
                                 ":\ncheck property " + prop +

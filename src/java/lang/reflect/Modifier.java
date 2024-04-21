@@ -1,33 +1,34 @@
 /*
  * Copyright (c) 1996, 2013, Oracle and/or its affiliates. All rights reserved.
- * ORACLE PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
  *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
  *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
- *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+ * or visit www.oracle.com if you need additional information or have any
+ * questions.
  */
 
 package java.lang.reflect;
 
 import java.security.AccessController;
-import sun.reflect.LangReflectAccess;
-import sun.reflect.ReflectionFactory;
+import java.util.StringJoiner;
+import jdk.internal.reflect.LangReflectAccess;
+import jdk.internal.reflect.ReflectionFactory;
 
 /**
  * The Modifier class provides {@code static} methods and
@@ -42,6 +43,7 @@ import sun.reflect.ReflectionFactory;
  *
  * @author Nakul Saraiya
  * @author Kenneth Russell
+ * @since 1.1
  */
 public class Modifier {
 
@@ -50,8 +52,7 @@ public class Modifier {
      *  packages
      */
     static {
-        sun.reflect.ReflectionFactory factory =
-            AccessController.doPrivileged(
+        ReflectionFactory factory = AccessController.doPrivileged(
                 new ReflectionFactory.GetReflectionFactoryAction());
         factory.setLangReflectAccess(new java.lang.reflect.ReflectAccess());
     }
@@ -232,27 +233,24 @@ public class Modifier {
      * represented by {@code mod}
      */
     public static String toString(int mod) {
-        StringBuilder sb = new StringBuilder();
-        int len;
+        StringJoiner sj = new StringJoiner(" ");
 
-        if ((mod & PUBLIC) != 0)        sb.append("public ");
-        if ((mod & PROTECTED) != 0)     sb.append("protected ");
-        if ((mod & PRIVATE) != 0)       sb.append("private ");
+        if ((mod & PUBLIC) != 0)        sj.add("public");
+        if ((mod & PROTECTED) != 0)     sj.add("protected");
+        if ((mod & PRIVATE) != 0)       sj.add("private");
 
         /* Canonical order */
-        if ((mod & ABSTRACT) != 0)      sb.append("abstract ");
-        if ((mod & STATIC) != 0)        sb.append("static ");
-        if ((mod & FINAL) != 0)         sb.append("final ");
-        if ((mod & TRANSIENT) != 0)     sb.append("transient ");
-        if ((mod & VOLATILE) != 0)      sb.append("volatile ");
-        if ((mod & SYNCHRONIZED) != 0)  sb.append("synchronized ");
-        if ((mod & NATIVE) != 0)        sb.append("native ");
-        if ((mod & STRICT) != 0)        sb.append("strictfp ");
-        if ((mod & INTERFACE) != 0)     sb.append("interface ");
+        if ((mod & ABSTRACT) != 0)      sj.add("abstract");
+        if ((mod & STATIC) != 0)        sj.add("static");
+        if ((mod & FINAL) != 0)         sj.add("final");
+        if ((mod & TRANSIENT) != 0)     sj.add("transient");
+        if ((mod & VOLATILE) != 0)      sj.add("volatile");
+        if ((mod & SYNCHRONIZED) != 0)  sj.add("synchronized");
+        if ((mod & NATIVE) != 0)        sj.add("native");
+        if ((mod & STRICT) != 0)        sj.add("strictfp");
+        if ((mod & INTERFACE) != 0)     sj.add("interface");
 
-        if ((len = sb.length()) > 0)    /* trim trailing space */
-            return sb.toString().substring(0, len-1);
-        return "";
+        return sj.toString();
     }
 
     /*
