@@ -307,6 +307,8 @@ public class Object {
     public final native void notifyAll();
 
     /**
+     * wait的作用就是释放锁对象，将当前线程置于等待状态，使其其他线程能够获取该锁并执行相应的操作；
+     * wait跟synchronized一起使用
      * Causes the current thread to wait until it is awakened, typically
      * by being <em>notified</em> or <em>interrupted</em>.
      * <p>
@@ -463,6 +465,7 @@ public class Object {
     }
 
     /**
+     * 主要用于垃圾回收器执行一些清理和资源回收的操作
      * Called by the garbage collector on an object when garbage collection
      * determines that there are no more references to the object.
      * A subclass overrides the {@code finalize} method to dispose of

@@ -280,13 +280,14 @@ class Thread implements Runnable {
      * execution) for the specified number of milliseconds, subject to
      * the precision and accuracy of system timers and schedulers. The thread
      * does not lose ownership of any monitors.
+     * 休眠的时间受制于系统计时器和调度器的制约，休眠后但不会丢掉任何监视器的所有权
      *
      * @param  millis
      *         the length of time to sleep in milliseconds
      *
      * @throws  IllegalArgumentException
      *          if the value of {@code millis} is negative
-     *
+     * 当异常抛出后，当前线程的中断状态会被清理掉
      * @throws  InterruptedException
      *          if any thread has interrupted the current thread. The
      *          <i>interrupted status</i> of the current thread is
@@ -1781,6 +1782,7 @@ class Thread implements Runnable {
     public enum State {
         /**
          * Thread state for a thread which has not yet started.
+         * 尚未启动的线程状态
          */
         NEW,
 
