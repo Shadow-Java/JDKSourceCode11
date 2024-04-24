@@ -308,7 +308,13 @@ public class Object {
 
     /**
      * wait的作用就是释放锁对象，将当前线程置于等待状态，使其其他线程能够获取该锁并执行相应的操作；
-     * wait跟synchronized一起使用
+     * wait跟synchronized一起使用</br>
+     * <p>
+     * wait() {
+     *  // 释放锁
+     *  // 阻塞，等待被其他线程notify
+     *  // 重新获取锁
+     * </p>
      * Causes the current thread to wait until it is awakened, typically
      * by being <em>notified</em> or <em>interrupted</em>.
      * <p>
