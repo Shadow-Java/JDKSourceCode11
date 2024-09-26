@@ -141,6 +141,8 @@ public interface ExecutorService extends Executor {
      * Initiates an orderly shutdown in which previously submitted
      * tasks are executed, but no new tasks will be accepted.
      * Invocation has no additional effect if already shut down.
+     * 1.禁止新任务提交：调用 shutdown() 方法后，不能再向 ExecutorService 提交新的任务。如果尝试提交新的任务，会抛出 RejectedExecutionException 异常
+     * 2.等待当前任务完成：已经提交但未开始执行的任务会继续排队等待执行，已经执行的任务会继续执行直到完成。
      *
      * <p>This method does not wait for previously submitted tasks to
      * complete execution.  Use {@link #awaitTermination awaitTermination}
@@ -192,6 +194,7 @@ public interface ExecutorService extends Executor {
      * Returns {@code true} if all tasks have completed following shut down.
      * Note that {@code isTerminated} is never {@code true} unless
      * either {@code shutdown} or {@code shutdownNow} was called first.
+     * true表示线程池已经终止，所有已经提交的任务已经执行完毕，false表示还有一些任务未执行完毕，线程池还未终止
      *
      * @return {@code true} if all tasks have completed following shut down
      */

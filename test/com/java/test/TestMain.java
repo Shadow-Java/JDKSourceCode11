@@ -10,12 +10,10 @@ import java.util.concurrent.ThreadFactory;
 public class TestMain {
 
     public static void main(String[] args) {
-        Executors.newFixedThreadPool(2, new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                return null;
-            }
-        });
+        StringBuffer sb = new StringBuffer();
+        sb.append("Hello");
+        final String tes = "Hello";
+        System.out.println(sb.toString().equals(tes));
     }
 
 }
